@@ -110,23 +110,14 @@ new HouseData[MAX_HOUSES][E_HOUSE_DATA];
 // Generic Utilities
 // -----------------------------------------------------------------------------
 
-stock GetName(playerid)
+GetName(playerid)
 {
 	new name[MAX_PLAYER_NAME];
 	GetPlayerName(playerid, name, sizeof(name));
 	return name;
 }
 
-stock IsNumeric(const string[])
-{
-    for(new i = 0, j = strlen(string); i < j; i++)
-    {
-        if(string[i] > '9' || string[i] < '0') return 0;
-    }
-    return 1;
-}
-
-stock Float:GetPosBehindPlayer(playerid, &Float:x, &Float:y, Float:distance)
+Float:GetPosBehindPlayer(playerid, &Float:x, &Float:y, Float:distance)
 {
     new Float:a;
     GetPlayerPos(playerid, x, y, a);
@@ -145,7 +136,7 @@ stock Float:GetPosBehindPlayer(playerid, &Float:x, &Float:y, Float:distance)
     return a;
 }
 
-stock PointInRangeOfPoint(Float:range, Float:x, Float:y, Float:z, Float:x2, Float:y2, Float:z2)
+PointInRangeOfPoint(Float:range, Float:x, Float:y, Float:z, Float:x2, Float:y2, Float:z2)
 {
     x2 -= x;
     y2 -= y;
@@ -153,7 +144,7 @@ stock PointInRangeOfPoint(Float:range, Float:x, Float:y, Float:z, Float:x2, Floa
     return ((x2 * x2) + (y2 * y2) + (z2 * z2)) < (range * range);
 }
 
-stock ReturnPercent(amount, percent)
+ReturnPercent(amount, percent)
 {
 	return (amount / 100 * percent);
 }
@@ -162,7 +153,7 @@ stock ReturnPercent(amount, percent)
 // Non-Generic Utilities
 // -----------------------------------------------------------------------------
 
-stock GetFreeHouseSlot()
+GetFreeHouseSlot()
 {
 	new query[128];
 	for(new i = 0; i < MAX_HOUSES; i++)
@@ -177,7 +168,7 @@ stock GetFreeHouseSlot()
 	return -1;
 }
 
-stock IsPlayerNearHouse(playerid, Float:distance)
+IsPlayerNearHouse(playerid, Float:distance)
 {
 	for(new i = 0; i < MAX_HOUSES; i++)
 	{
@@ -189,7 +180,7 @@ stock IsPlayerNearHouse(playerid, Float:distance)
 	return 0;
 }
 
-stock GetOwnedHouseID(playerid)
+GetOwnedHouseID(playerid)
 {
 	new query[128], field[MAX_PLAYER_NAME];
 	for(new i = 0; i < MAX_HOUSES; i++)
@@ -212,7 +203,7 @@ stock GetOwnedHouseID(playerid)
 	return -1;
 }
 
-stock UpdateNearbyLandValue(houseid)
+UpdateNearbyLandValue(houseid)
 {
 	new label[128], query[128];
     for(new i = 0; i < MAX_HOUSES; i++)
@@ -550,19 +541,31 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 	    {
 	        if(response)
 	        {
-	            if(!IsNumeric(inputtext) || strval(inputtext) < 1) return SendClientMessage(playerid, ERROR_COLOUR, "SERVER: You must input a number greater than 0.");
-	            if(GetPlayerMoney(playerid) < strval(inputtext)) return SendClientMessage(playerid, ERROR_COLOUR, "SERVER: You are not holding that much money.");
+				new money;
+
+				if(sscanf(inputtext, "d", money) || money < 1)
+				{
+					SendClientMessage(playerid, ERROR_COLOUR, "SERVER: You must input a number greater than 0.");
+					return 1;
+				}
+
+	            if(GetPlayerMoney(playerid) < money) 
+				{
+					SendClientMessage(playerid, ERROR_COLOUR, "SERVER: You are not holding that much money.");
+					return 1;
+				}
 	            
-	            GivePlayerMoney(playerid, -strval(inputtext));
+	            GivePlayerMoney(playerid, -money);
 	            
 	            new houseid = PlayerData[playerid][E_PLAYER_HOUSE_ID], query[128];
-	            HouseData[houseid][E_HOUSE_SAFE] = (HouseData[houseid][E_HOUSE_SAFE] + strval(inputtext));
+	            HouseData[houseid][E_HOUSE_SAFE] += money;
 	            
 				format(query, sizeof(query), "UPDATE `HOUSES` SET `SAFE` = '%i' WHERE `ID` = '%i'", HouseData[houseid][E_HOUSE_SAFE], houseid);
 				gDatabaseResult = db_query(gServerDatabase, query);
 				db_free_result(gDatabaseResult);
 	            
-	            return GameTextForPlayer(playerid, "~g~Money Deposited!", 3000, 5);
+	            GameTextForPlayer(playerid, "~g~Money Deposited!", 3000, 5);
+				return 1;
 	        }
 	        else
 	        {
@@ -574,21 +577,28 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 	    {
 	        if(response)
 	        {
-	            if(!IsNumeric(inputtext) || strval(inputtext) < 1) return SendClientMessage(playerid, ERROR_COLOUR, "SERVER: You must input a number greater than 0.");
+				new money;
+
+				if(sscanf(inputtext, "d", money) || money < 1)
+				{
+					SendClientMessage(playerid, ERROR_COLOUR, "SERVER: You must input a number greater than 0.");
+					return 1;
+				}
 	            
 	            new houseid = PlayerData[playerid][E_PLAYER_HOUSE_ID];
-	            if(strval(inputtext) > HouseData[houseid][E_HOUSE_SAFE]) return SendClientMessage(playerid, ERROR_COLOUR, "SERVER: You do not have that much money in your safe.");
+	            if(money > HouseData[houseid][E_HOUSE_SAFE]) return SendClientMessage(playerid, ERROR_COLOUR, "SERVER: You do not have that much money in your safe.");
 
-	            GivePlayerMoney(playerid, strval(inputtext));
+	            GivePlayerMoney(playerid, money);
 
-	            HouseData[houseid][E_HOUSE_SAFE] = (HouseData[houseid][E_HOUSE_SAFE] - strval(inputtext));
+	            HouseData[houseid][E_HOUSE_SAFE] -= money;
 
 	            new query[128];
 				format(query, sizeof(query), "UPDATE `HOUSES` SET `SAFE` = '%i' WHERE `ID` = '%i'", HouseData[houseid][E_HOUSE_SAFE], houseid);
 				gDatabaseResult = db_query(gServerDatabase, query);
 				db_free_result(gDatabaseResult);
 
-	            return GameTextForPlayer(playerid, "~g~Money Withdrawn!", 3000, 5);
+	            GameTextForPlayer(playerid, "~g~Money Withdrawn!", 3000, 5);
+				return 1;
 	        }
 	        else
 	        {
