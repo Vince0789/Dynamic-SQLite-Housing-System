@@ -3,91 +3,112 @@
 	Version: 1.0 (2021)
 	Credits: Weponz (Developer), [N]1ghtM4r3_ (BETA Tester), H&Wplayz (BETA Tester)
 */
+
 #define FILTERSCRIPT
-#include <a_samp>//Credits: SA-MP Team
-#include <samp_bcrypt>//Credits: _SyS_
-#include <streamer>//Credits: Incognito
-#include <sscanf2>//Credits: Y_Less
-#include <zcmd>//Credits: ZeeX
 
-#define ERROR_COLOUR 0xFF0000FF//Default: Red
-#define NOTICE_COLOUR 0xFFFF00FF//Default: Yellow
-#define LABEL_COLOUR 0xFFFFFFFF//Default: White
+// -----------------------------------------------------------------------------
+// Dependencies
+// -----------------------------------------------------------------------------
 
-#define SERVER_DATABASE "houses.db"//This is where the database will be saved (scriptfiles)
+#include <a_samp>		//Credits: SA-MP Team
+#include <samp_bcrypt>	//Credits: _SyS_
+#include <streamer>		//Credits: Incognito
+#include <sscanf2>		//Credits: Y_Less
+#include <zcmd>			//Credits: ZeeX
 
-#define MAX_HOUSES 500//This will be the maximum amount of houses that can be created
+// -----------------------------------------------------------------------------
+// Configuration and definitions
+// -----------------------------------------------------------------------------
 
-#define LAND_VALUE_PERCENT 12//The percentage of interest added when a nearby house sells (Default: 12%)
+#define ERROR_COLOUR 	0xFF0000FF	//Default: Red
+#define NOTICE_COLOUR 	0xFFFF00FF	//Default: Yellow
+#define LABEL_COLOUR 	0xFFFFFFFF	//Default: White
 
-#define HOUSE_ONE_PRICE (random(500000) + 500000)//Default: 1 Story House (Random 500K-1M)
-#define HOUSE_TWO_PRICE (random(1000000) + 1000000)//Default: 2 Story House (Random 1M-2M)
-#define MANSION_ONE_PRICE (random(2000000) + 2000000)//Default: Small Mansion (Random 2M-4M)
-#define MANSION_TWO_PRICE (random(4000000) + 4000000)//Default: Large Mansion (Random 4M-8M)
-#define APARTMENT_PRICE (random(3000000) + 3000000)//Default: Apartment (Random 3M-6M)
+#define SERVER_DATABASE "houses.db"	//This is where the database will be saved (scriptfiles)
 
-#define BUY_DIALOG 1234//Change this number if it clashes with other scripts using the same dialogid
-#define VERIFY_DIALOG 1235//Change this number if it clashes with other scripts using the same dialogid
-#define ACCESS_DIALOG 1236//Change this number if it clashes with other scripts using the same dialogid
-#define MENU_DIALOG 1237//Change this number if it clashes with other scripts using the same dialogid
-#define NAME_DIALOG 1238//Change this number if it clashes with other scripts using the same dialogid
-#define PASS_DIALOG 1239//Change this number if it clashes with other scripts using the same dialogid
-#define SAFE_DIALOG 1240//Change this number if it clashes with other scripts using the same dialogid
-#define BALANCE_DIALOG 1241//Change this number if it clashes with other scripts using the same dialogid
-#define DEPOSIT_DIALOG 1242//Change this number if it clashes with other scripts using the same dialogid
-#define WITHDRAW_DIALOG 1243//Change this number if it clashes with other scripts using the same dialogid
-#define SELL_DIALOG 1244//Change this number if it clashes with other scripts using the same dialogid
-#define COMMANDS_DIALOG 1245//Change this number if it clashes with other scripts using the same dialogid
+#define MAX_HOUSES 		(500)	//This will be the maximum amount of houses that can be created
+
+#define LAND_VALUE_PERCENT (12)	//The percentage of interest added when a nearby house sells (Default: 12%)
+
+#define HOUSE_ONE_PRICE 	(random(500000)  + 500000)	//Default: 1 Story House (Random 500K-1M)
+#define HOUSE_TWO_PRICE 	(random(1000000) + 1000000)	//Default: 2 Story House (Random 1M-2M)
+#define MANSION_ONE_PRICE 	(random(2000000) + 2000000)	//Default: Small Mansion (Random 2M-4M)
+#define MANSION_TWO_PRICE 	(random(4000000) + 4000000)	//Default: Large Mansion (Random 4M-8M)
+#define APARTMENT_PRICE 	(random(3000000) + 3000000)	//Default: Apartment (Random 3M-6M)
+
+enum 
+{
+	BUY_DIALOG = 1234, //Change this number if it clashes with other scripts using the same dialogid
+	VERIFY_DIALOG,
+	ACCESS_DIALOG,
+	MENU_DIALOG,
+	NAME_DIALOG,
+	PASS_DIALOG,
+	SAFE_DIALOG,
+	BALANCE_DIALOG,
+	DEPOSIT_DIALOG,
+	WITHDRAW_DIALOG,
+	SELL_DIALOG,
+	COMMANDS_DIALOG,
+};
+
+// -----------------------------------------------------------------------------
+// Forward declarations
+// -----------------------------------------------------------------------------
 
 forward EncryptHousePassword(playerid, houseid);
 forward VerifyHousePassword(playerid, bool:success);
 
-new DB:server_database;
-new DBResult:database_result;
+new DB:gServerDatabase;
+new DBResult:gDatabaseResult;
 
-enum player_data
+enum E_PLAYER_DATA
 {
-	player_houseid,
-	player_salehouse,
-	player_saleprice,
-	player_saleowner,
-	player_saleto,
-	player_spam,
-	bool:player_saleactive
+	E_PLAYER_HOUSE_ID,
+	E_PLAYER_SALE_HOUSE,
+	E_PLAYER_SALE_PRICE,
+	E_PLAYER_SALE_OWNER,
+	E_PLAYER_SALE_TO,
+	E_PLAYER_SPAM,
+	bool:E_PLAYER_SALE_ACTIVE
 };
-new PlayerData[MAX_PLAYERS][player_data];
+new PlayerData[MAX_PLAYERS][E_PLAYER_DATA];
 
-enum house_data
+enum E_HOUSE_DATA
 {
-	house_owner[MAX_PLAYER_NAME],
-	house_name[64],
-	house_value,
-	house_safe,
-	Float:house_extx,
-	Float:house_exty,
-	Float:house_extz,
-	Float:house_intx,
-	Float:house_inty,
-	Float:house_intz,
-	Float:house_enterx,
-	Float:house_entery,
-	Float:house_enterz,
-	Float:house_entera,
-	Float:house_exitx,
-	Float:house_exity,
-	Float:house_exitz,
-	Float:house_exita,
-	house_extinterior,
-	house_extworld,
-	house_intinterior,
-	house_intworld,
-	house_mapicon,
-	house_entercp,
-	house_exitcp,
-	Text3D:house_label,
-	bool:house_active
+	E_HOUSE_OWNER[MAX_PLAYER_NAME],
+	E_HOUSE_NAME[64],
+	E_HOUSE_VALUE,
+	E_HOUSE_SAFE,
+	Float:E_HOUSE_EXT_X,
+	Float:E_HOUSE_EXT_Y,
+	Float:E_HOUSE_EXT_Z,
+	Float:E_HOUSE_INT_X,
+	Float:E_HOUSE_INT_Y,
+	Float:E_HOUSE_INT_Z,
+	Float:E_HOUSE_ENTER_X,
+	Float:E_HOUSE_ENTER_Y,
+	Float:E_HOUSE_ENTER_Z,
+	Float:E_HOUSE_ENTER_A,
+	Float:E_HOUSE_EXIT_X,
+	Float:E_HOUSE_EXIT_Y,
+	Float:E_HOUSE_EXIT_Z,
+	Float:E_HOUSE_EXIT_A,
+	E_HOUSE_EXT_INTERIOR,
+	E_HOUSE_EXT_WORLD,
+	E_HOUSE_INT_INTERIOR,
+	E_HOUSE_INT_WORLD,
+	E_HOUSE_MAPICON,
+	E_HOUSE_ENTER_CP,
+	E_HOUSE_EXIT_CP,
+	Text3D:E_HOUSE_LABEL,
+	bool:E_HOUSE_IS_ACTIVE,
 };
-new HouseData[MAX_HOUSES][house_data];
+new HouseData[MAX_HOUSES][E_HOUSE_DATA];
+
+// -----------------------------------------------------------------------------
+// Generic Utilities
+// -----------------------------------------------------------------------------
 
 stock GetName(playerid)
 {
@@ -96,7 +117,7 @@ stock GetName(playerid)
 	return name;
 }
 
-stock IsNumeric(string[])
+stock IsNumeric(const string[])
 {
     for(new i = 0, j = strlen(string); i < j; i++)
     {
@@ -137,14 +158,18 @@ stock ReturnPercent(amount, percent)
 	return (amount / 100 * percent);
 }
 
+// -----------------------------------------------------------------------------
+// Non-Generic Utilities
+// -----------------------------------------------------------------------------
+
 stock GetFreeHouseSlot()
 {
 	new query[128];
 	for(new i = 0; i < MAX_HOUSES; i++)
 	{
 		format(query, sizeof(query), "SELECT `ID` FROM `HOUSES` WHERE `ID` = '%i'", i);
-		database_result = db_query(server_database, query);
-		if(!db_num_rows(database_result))
+		gDatabaseResult = db_query(gServerDatabase, query);
+		if(!db_num_rows(gDatabaseResult))
 		{
 		    return i;
 		}
@@ -156,9 +181,9 @@ stock IsPlayerNearHouse(playerid, Float:distance)
 {
 	for(new i = 0; i < MAX_HOUSES; i++)
 	{
-	    if(HouseData[i][house_active] == true)
+	    if(HouseData[i][E_HOUSE_IS_ACTIVE] == true)
 	    {
-	    	if(IsPlayerInRangeOfPoint(playerid, distance, HouseData[i][house_extx], HouseData[i][house_exty], HouseData[i][house_extz])) return 1;
+	    	if(IsPlayerInRangeOfPoint(playerid, distance, HouseData[i][E_HOUSE_EXT_X], HouseData[i][E_HOUSE_EXT_Y], HouseData[i][E_HOUSE_EXT_Z])) return 1;
 	    }
 	}
 	return 0;
@@ -169,19 +194,19 @@ stock GetOwnedHouseID(playerid)
 	new query[128], field[MAX_PLAYER_NAME];
 	for(new i = 0; i < MAX_HOUSES; i++)
 	{
-	    if(HouseData[i][house_active] == true)
+	    if(HouseData[i][E_HOUSE_IS_ACTIVE] == true)
 	    {
 		    format(query, sizeof(query), "SELECT `OWNER` FROM `HOUSES` WHERE `ID` = '%i'", i);
-			database_result = db_query(server_database, query);
-			if(db_num_rows(database_result))
+			gDatabaseResult = db_query(gServerDatabase, query);
+			if(db_num_rows(gDatabaseResult))
 		  	{
-		    	db_get_field_assoc(database_result, "OWNER", field, sizeof(field));
+		    	db_get_field_assoc(gDatabaseResult, "OWNER", field, sizeof(field));
 
-				db_free_result(database_result);
+				db_free_result(gDatabaseResult);
 
-			 	if(!strcmp(HouseData[i][house_owner], GetName(playerid), true) && IsPlayerInRangeOfPoint(playerid, 100.0, HouseData[i][house_intx], HouseData[i][house_inty], HouseData[i][house_intz])) return i;
+			 	if(!strcmp(HouseData[i][E_HOUSE_OWNER], GetName(playerid), true) && IsPlayerInRangeOfPoint(playerid, 100.0, HouseData[i][E_HOUSE_INT_X], HouseData[i][E_HOUSE_INT_Y], HouseData[i][E_HOUSE_INT_Z])) return i;
 			}
-			db_free_result(database_result);
+			db_free_result(gDatabaseResult);
 		}
 	}
 	return -1;
@@ -192,128 +217,132 @@ stock UpdateNearbyLandValue(houseid)
 	new label[128], query[128];
     for(new i = 0; i < MAX_HOUSES; i++)
 	{
-	    if(HouseData[i][house_active] == true && i != houseid)
+	    if(HouseData[i][E_HOUSE_IS_ACTIVE] == true && i != houseid)
 		{
-			if(PointInRangeOfPoint(100.0, HouseData[houseid][house_extx], HouseData[houseid][house_exty], HouseData[houseid][house_extz], HouseData[i][house_extx], HouseData[i][house_exty], HouseData[i][house_extz]))
+			if(PointInRangeOfPoint(100.0, HouseData[houseid][E_HOUSE_EXT_X], HouseData[houseid][E_HOUSE_EXT_Y], HouseData[houseid][E_HOUSE_EXT_Z], HouseData[i][E_HOUSE_EXT_X], HouseData[i][E_HOUSE_EXT_Y], HouseData[i][E_HOUSE_EXT_Z]))
 			{
-				HouseData[i][house_value] = (HouseData[i][house_value] + ReturnPercent(HouseData[i][house_value], LAND_VALUE_PERCENT));
+				HouseData[i][E_HOUSE_VALUE] = (HouseData[i][E_HOUSE_VALUE] + ReturnPercent(HouseData[i][E_HOUSE_VALUE], LAND_VALUE_PERCENT));
 
-			 	if(!strcmp(HouseData[i][house_owner], "~", true))
+			 	if(!strcmp(HouseData[i][E_HOUSE_OWNER], "~", true))
 				{
-					format(label, sizeof(label), "4-Sale\nPrice: $%i", HouseData[i][house_value]);
-					UpdateDynamic3DTextLabelText(HouseData[i][house_label], LABEL_COLOUR, label);
+					format(label, sizeof(label), "4-Sale\nPrice: $%i", HouseData[i][E_HOUSE_VALUE]);
+					UpdateDynamic3DTextLabelText(HouseData[i][E_HOUSE_LABEL], LABEL_COLOUR, label);
 				}
 				else
 				{
-					format(label, sizeof(label), "%s\nValue: $%i", HouseData[i][house_name], HouseData[i][house_value]);
-					UpdateDynamic3DTextLabelText(HouseData[i][house_label], LABEL_COLOUR, label);
+					format(label, sizeof(label), "%s\nValue: $%i", HouseData[i][E_HOUSE_NAME], HouseData[i][E_HOUSE_VALUE]);
+					UpdateDynamic3DTextLabelText(HouseData[i][E_HOUSE_LABEL], LABEL_COLOUR, label);
 				}
 
-				format(query, sizeof(query), "UPDATE `HOUSES` SET `VALUE` = '%i' WHERE `ID` = '%i'", HouseData[i][house_value], i);
-				database_result = db_query(server_database, query);
-				db_free_result(database_result);
+				format(query, sizeof(query), "UPDATE `HOUSES` SET `VALUE` = '%i' WHERE `ID` = '%i'", HouseData[i][E_HOUSE_VALUE], i);
+				gDatabaseResult = db_query(gServerDatabase, query);
+				db_free_result(gDatabaseResult);
 		    }
 	    }
 	}
 	return 1;
 }
 
+// -----------------------------------------------------------------------------
+// Event Handlers
+// -----------------------------------------------------------------------------
+
 public OnFilterScriptInit()
 {
-    server_database = db_open(SERVER_DATABASE);
-    db_query(server_database, "CREATE TABLE IF NOT EXISTS `HOUSES` (`ID`, `OWNER`, `NAME`, `PASS`, `VALUE`, `SAFE`, `EXTX`, `EXTY`, `EXTZ`, `INTX`, `INTY`, `INTZ`, `ENTERX`, `ENTERY`, `ENTERZ`, `ENTERA`, `EXITX`, `EXITY`, `EXITZ`, `EXITA`, `EXTINTERIOR`, `EXTWORLD`, `INTINTERIOR`, `INTWORLD`)");
+    gServerDatabase = db_open(SERVER_DATABASE);
+    db_query(gServerDatabase, "CREATE TABLE IF NOT EXISTS `HOUSES` (`ID`, `OWNER`, `NAME`, `PASS`, `VALUE`, `SAFE`, `EXTX`, `EXTY`, `EXTZ`, `INTX`, `INTY`, `INTZ`, `ENTERX`, `ENTERY`, `ENTERZ`, `ENTERA`, `EXITX`, `EXITY`, `EXITZ`, `EXITA`, `EXTINTERIOR`, `EXTWORLD`, `INTINTERIOR`, `INTWORLD`)");
 
 	new query[128], field[64], field2[MAX_PLAYER_NAME], label[128];
 	for(new i = 0; i < MAX_HOUSES; i++)
 	{
 		format(query, sizeof(query), "SELECT * FROM `HOUSES` WHERE `ID` = '%i'", i);
-		database_result = db_query(server_database, query);
-		if(db_num_rows(database_result))
+		gDatabaseResult = db_query(gServerDatabase, query);
+		if(db_num_rows(gDatabaseResult))
 		{
-	 		db_get_field_assoc(database_result, "OWNER", field2, sizeof(field2));
-	     	HouseData[i][house_owner] = field2;
+	 		db_get_field_assoc(gDatabaseResult, "OWNER", field2, sizeof(field2));
+	     	HouseData[i][E_HOUSE_OWNER] = field2;
 
-	     	db_get_field_assoc(database_result, "NAME", field, sizeof(field));
-	     	HouseData[i][house_name] = field;
+	     	db_get_field_assoc(gDatabaseResult, "NAME", field, sizeof(field));
+	     	HouseData[i][E_HOUSE_NAME] = field;
 
-	    	db_get_field_assoc(database_result, "VALUE", field, sizeof(field));
-	      	HouseData[i][house_value] = strval(field);
+	    	db_get_field_assoc(gDatabaseResult, "VALUE", field, sizeof(field));
+	      	HouseData[i][E_HOUSE_VALUE] = strval(field);
 
-	     	db_get_field_assoc(database_result, "SAFE", field, sizeof(field));
-	     	HouseData[i][house_safe] = strval(field);
+	     	db_get_field_assoc(gDatabaseResult, "SAFE", field, sizeof(field));
+	     	HouseData[i][E_HOUSE_SAFE] = strval(field);
 
-	     	db_get_field_assoc(database_result, "EXTX", field, sizeof(field));
-	      	HouseData[i][house_extx] = floatstr(field);
+	     	db_get_field_assoc(gDatabaseResult, "EXTX", field, sizeof(field));
+	      	HouseData[i][E_HOUSE_EXT_X] = floatstr(field);
 
-	    	db_get_field_assoc(database_result, "EXTY", field, sizeof(field));
-	    	HouseData[i][house_exty] = floatstr(field);
+	    	db_get_field_assoc(gDatabaseResult, "EXTY", field, sizeof(field));
+	    	HouseData[i][E_HOUSE_EXT_Y] = floatstr(field);
 
-	      	db_get_field_assoc(database_result, "EXTZ", field, sizeof(field));
-	     	HouseData[i][house_extz] = floatstr(field);
+	      	db_get_field_assoc(gDatabaseResult, "EXTZ", field, sizeof(field));
+	     	HouseData[i][E_HOUSE_EXT_Z] = floatstr(field);
 
-	    	db_get_field_assoc(database_result, "INTX", field, sizeof(field));
-	     	HouseData[i][house_intx] = floatstr(field);
+	    	db_get_field_assoc(gDatabaseResult, "INTX", field, sizeof(field));
+	     	HouseData[i][E_HOUSE_INT_X] = floatstr(field);
 
-	      	db_get_field_assoc(database_result, "INTY", field, sizeof(field));
-	      	HouseData[i][house_inty] = floatstr(field);
+	      	db_get_field_assoc(gDatabaseResult, "INTY", field, sizeof(field));
+	      	HouseData[i][E_HOUSE_INT_Y] = floatstr(field);
 
-	     	db_get_field_assoc(database_result, "INTZ", field, sizeof(field));
-	      	HouseData[i][house_intz] = floatstr(field);
+	     	db_get_field_assoc(gDatabaseResult, "INTZ", field, sizeof(field));
+	      	HouseData[i][E_HOUSE_INT_Z] = floatstr(field);
 
-	     	db_get_field_assoc(database_result, "ENTERX", field, sizeof(field));
-	      	HouseData[i][house_enterx] = floatstr(field);
+	     	db_get_field_assoc(gDatabaseResult, "ENTERX", field, sizeof(field));
+	      	HouseData[i][E_HOUSE_ENTER_X] = floatstr(field);
 
-	      	db_get_field_assoc(database_result, "ENTERY", field, sizeof(field));
-	      	HouseData[i][house_entery] = floatstr(field);
+	      	db_get_field_assoc(gDatabaseResult, "ENTERY", field, sizeof(field));
+	      	HouseData[i][E_HOUSE_ENTER_Y] = floatstr(field);
 
-	      	db_get_field_assoc(database_result, "ENTERZ", field, sizeof(field));
-	      	HouseData[i][house_enterz] = floatstr(field);
+	      	db_get_field_assoc(gDatabaseResult, "ENTERZ", field, sizeof(field));
+	      	HouseData[i][E_HOUSE_ENTER_Z] = floatstr(field);
 
-	      	db_get_field_assoc(database_result, "ENTERA", field, sizeof(field));
-	      	HouseData[i][house_entera] = floatstr(field);
+	      	db_get_field_assoc(gDatabaseResult, "ENTERA", field, sizeof(field));
+	      	HouseData[i][E_HOUSE_ENTER_A] = floatstr(field);
 
-	      	db_get_field_assoc(database_result, "EXITX", field, sizeof(field));
-	     	HouseData[i][house_exitx] = floatstr(field);
+	      	db_get_field_assoc(gDatabaseResult, "EXITX", field, sizeof(field));
+	     	HouseData[i][E_HOUSE_EXIT_X] = floatstr(field);
 
-	    	db_get_field_assoc(database_result, "EXITY", field, sizeof(field));
-	      	HouseData[i][house_exity] = floatstr(field);
+	    	db_get_field_assoc(gDatabaseResult, "EXITY", field, sizeof(field));
+	      	HouseData[i][E_HOUSE_EXIT_Y] = floatstr(field);
 
-	     	db_get_field_assoc(database_result, "EXITZ", field, sizeof(field));
-	     	HouseData[i][house_exitz] = floatstr(field);
+	     	db_get_field_assoc(gDatabaseResult, "EXITZ", field, sizeof(field));
+	     	HouseData[i][E_HOUSE_EXIT_Z] = floatstr(field);
 
-	     	db_get_field_assoc(database_result, "EXITA", field, sizeof(field));
-	      	HouseData[i][house_exita] = floatstr(field);
+	     	db_get_field_assoc(gDatabaseResult, "EXITA", field, sizeof(field));
+	      	HouseData[i][E_HOUSE_EXIT_A] = floatstr(field);
 
-	      	db_get_field_assoc(database_result, "EXTINTERIOR", field, sizeof(field));
-	      	HouseData[i][house_extinterior] = strval(field);
+	      	db_get_field_assoc(gDatabaseResult, "EXTINTERIOR", field, sizeof(field));
+	      	HouseData[i][E_HOUSE_EXT_INTERIOR] = strval(field);
 
-	      	db_get_field_assoc(database_result, "EXTWORLD", field, sizeof(field));
-	      	HouseData[i][house_extworld] = strval(field);
+	      	db_get_field_assoc(gDatabaseResult, "EXTWORLD", field, sizeof(field));
+	      	HouseData[i][E_HOUSE_EXT_WORLD] = strval(field);
 
-	     	db_get_field_assoc(database_result, "INTINTERIOR", field, sizeof(field));
-	      	HouseData[i][house_intinterior] = strval(field);
+	     	db_get_field_assoc(gDatabaseResult, "INTINTERIOR", field, sizeof(field));
+	      	HouseData[i][E_HOUSE_INT_INTERIOR] = strval(field);
 
-	     	db_get_field_assoc(database_result, "INTWORLD", field, sizeof(field));
-	      	HouseData[i][house_intworld] = strval(field);
+	     	db_get_field_assoc(gDatabaseResult, "INTWORLD", field, sizeof(field));
+	      	HouseData[i][E_HOUSE_INT_WORLD] = strval(field);
 	      	
-	      	HouseData[i][house_active] = true;
+	      	HouseData[i][E_HOUSE_IS_ACTIVE] = true;
 
-			format(label, sizeof(label), "%s\nValue: $%i", HouseData[i][house_name], HouseData[i][house_value]);
-			HouseData[i][house_label] = CreateDynamic3DTextLabel(label, LABEL_COLOUR, HouseData[i][house_extx], HouseData[i][house_exty], HouseData[i][house_extz] + 0.2, 4.0, INVALID_PLAYER_ID, INVALID_VEHICLE_ID, 1, HouseData[i][house_extworld], HouseData[i][house_extinterior], -1, 4.0);
+			format(label, sizeof(label), "%s\nValue: $%i", HouseData[i][E_HOUSE_NAME], HouseData[i][E_HOUSE_VALUE]);
+			HouseData[i][E_HOUSE_LABEL] = CreateDynamic3DTextLabel(label, LABEL_COLOUR, HouseData[i][E_HOUSE_EXT_X], HouseData[i][E_HOUSE_EXT_Y], HouseData[i][E_HOUSE_EXT_Z] + 0.2, 4.0, INVALID_PLAYER_ID, INVALID_VEHICLE_ID, 1, HouseData[i][E_HOUSE_EXT_WORLD], HouseData[i][E_HOUSE_EXT_INTERIOR], -1, 4.0);
 
-			if(!strcmp(HouseData[i][house_owner], "~", true))
+			if(!strcmp(HouseData[i][E_HOUSE_OWNER], "~", true))
 			{
-				HouseData[i][house_mapicon] = CreateDynamicMapIcon(HouseData[i][house_extx], HouseData[i][house_exty], HouseData[i][house_extz], 31, -1, -1, -1, -1, 250.0);
+				HouseData[i][E_HOUSE_MAPICON] = CreateDynamicMapIcon(HouseData[i][E_HOUSE_EXT_X], HouseData[i][E_HOUSE_EXT_Y], HouseData[i][E_HOUSE_EXT_Z], 31, -1, -1, -1, -1, 250.0);
 			}
 			else
 			{
-				HouseData[i][house_mapicon] = CreateDynamicMapIcon(HouseData[i][house_extx], HouseData[i][house_exty], HouseData[i][house_extz], 32, -1, -1, -1, -1, 250.0);
+				HouseData[i][E_HOUSE_MAPICON] = CreateDynamicMapIcon(HouseData[i][E_HOUSE_EXT_X], HouseData[i][E_HOUSE_EXT_Y], HouseData[i][E_HOUSE_EXT_Z], 32, -1, -1, -1, -1, 250.0);
 			}
 
-			HouseData[i][house_entercp] = CreateDynamicCP(HouseData[i][house_extx], HouseData[i][house_exty], HouseData[i][house_extz], 1.0, HouseData[i][house_extworld], HouseData[i][house_extinterior], -1, 4.0);
-			HouseData[i][house_exitcp] = CreateDynamicCP(HouseData[i][house_intx], HouseData[i][house_inty], HouseData[i][house_intz], 1.0, HouseData[i][house_intworld], HouseData[i][house_intinterior], -1, 4.0);
+			HouseData[i][E_HOUSE_ENTER_CP] = CreateDynamicCP(HouseData[i][E_HOUSE_EXT_X], HouseData[i][E_HOUSE_EXT_Y], HouseData[i][E_HOUSE_EXT_Z], 1.0, HouseData[i][E_HOUSE_EXT_WORLD], HouseData[i][E_HOUSE_EXT_INTERIOR], -1, 4.0);
+			HouseData[i][E_HOUSE_EXIT_CP] = CreateDynamicCP(HouseData[i][E_HOUSE_INT_X], HouseData[i][E_HOUSE_INT_Y], HouseData[i][E_HOUSE_INT_Z], 1.0, HouseData[i][E_HOUSE_INT_WORLD], HouseData[i][E_HOUSE_INT_INTERIOR], -1, 4.0);
 
-			db_free_result(database_result);
+			db_free_result(gDatabaseResult);
 		}
 	}
 	return 1;
@@ -323,30 +352,30 @@ public OnFilterScriptExit()
 {
 	for(new i = 0; i < MAX_HOUSES; i++)
 	{
-	    if(HouseData[i][house_active] == true)
+	    if(HouseData[i][E_HOUSE_IS_ACTIVE] == true)
 	    {
-			DestroyDynamic3DTextLabel(HouseData[i][house_label]);
-			DestroyDynamicMapIcon(HouseData[i][house_mapicon]);
-			DestroyDynamicCP(HouseData[i][house_entercp]);
-			DestroyDynamicCP(HouseData[i][house_exitcp]);
+			DestroyDynamic3DTextLabel(HouseData[i][E_HOUSE_LABEL]);
+			DestroyDynamicMapIcon(HouseData[i][E_HOUSE_MAPICON]);
+			DestroyDynamicCP(HouseData[i][E_HOUSE_ENTER_CP]);
+			DestroyDynamicCP(HouseData[i][E_HOUSE_EXIT_CP]);
 
-			HouseData[i][house_active] = false;
+			HouseData[i][E_HOUSE_IS_ACTIVE] = false;
 		}
 	}
 	
-    db_close(server_database);
+    db_close(gServerDatabase);
 	return 1;
 }
 
 public OnPlayerConnect(playerid)
 {
-    PlayerData[playerid][player_houseid] = -1;
-	PlayerData[playerid][player_salehouse] = -1;
-	PlayerData[playerid][player_saleprice] = 0;
-	PlayerData[playerid][player_saleowner] = INVALID_PLAYER_ID;
-	PlayerData[playerid][player_saleto] = INVALID_PLAYER_ID;
-	PlayerData[playerid][player_spam] = 0;
-	PlayerData[playerid][player_saleactive] = false;
+    PlayerData[playerid][E_PLAYER_HOUSE_ID] = -1;
+	PlayerData[playerid][E_PLAYER_SALE_HOUSE] = -1;
+	PlayerData[playerid][E_PLAYER_SALE_PRICE] = 0;
+	PlayerData[playerid][E_PLAYER_SALE_OWNER] = INVALID_PLAYER_ID;
+	PlayerData[playerid][E_PLAYER_SALE_TO] = INVALID_PLAYER_ID;
+	PlayerData[playerid][E_PLAYER_SPAM] = 0;
+	PlayerData[playerid][E_PLAYER_SALE_ACTIVE] = false;
 	return 1;
 }
 
@@ -359,15 +388,15 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 	        if(response)
 	        {
 	            new string[128];
-		   		format(string, sizeof(string), "{FFFFFF}Are you sure you want to buy this house for $%i?", HouseData[PlayerData[playerid][player_houseid]][house_value]);
+		   		format(string, sizeof(string), "{FFFFFF}Are you sure you want to buy this house for $%i?", HouseData[PlayerData[playerid][E_PLAYER_HOUSE_ID]][E_HOUSE_VALUE]);
 	            return ShowPlayerDialog(playerid, VERIFY_DIALOG, DIALOG_STYLE_MSGBOX, "{FFFFFF}Verify Purchase", string, "Yes", "No");
 	        }
 	        else
 	        {
-				SetPlayerInterior(playerid, HouseData[PlayerData[playerid][player_houseid]][house_intinterior]);
-				SetPlayerVirtualWorld(playerid, HouseData[PlayerData[playerid][player_houseid]][house_intworld]);
-   	    	  	SetPlayerPos(playerid, HouseData[PlayerData[playerid][player_houseid]][house_enterx], HouseData[PlayerData[playerid][player_houseid]][house_entery], HouseData[PlayerData[playerid][player_houseid]][house_enterz]);
-   	    	  	SetPlayerFacingAngle(playerid, HouseData[PlayerData[playerid][player_houseid]][house_entera]);
+				SetPlayerInterior(playerid, HouseData[PlayerData[playerid][E_PLAYER_HOUSE_ID]][E_HOUSE_INT_INTERIOR]);
+				SetPlayerVirtualWorld(playerid, HouseData[PlayerData[playerid][E_PLAYER_HOUSE_ID]][E_HOUSE_INT_WORLD]);
+   	    	  	SetPlayerPos(playerid, HouseData[PlayerData[playerid][E_PLAYER_HOUSE_ID]][E_HOUSE_ENTER_X], HouseData[PlayerData[playerid][E_PLAYER_HOUSE_ID]][E_HOUSE_ENTER_Y], HouseData[PlayerData[playerid][E_PLAYER_HOUSE_ID]][E_HOUSE_ENTER_Z]);
+   	    	  	SetPlayerFacingAngle(playerid, HouseData[PlayerData[playerid][E_PLAYER_HOUSE_ID]][E_HOUSE_ENTER_A]);
    	    	  	return SetCameraBehindPlayer(playerid);
 	        }
 	    }
@@ -375,33 +404,33 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 	    {
 	        if(response)
 	        {
-	            new houseid = PlayerData[playerid][player_houseid];
-	            if(GetPlayerMoney(playerid) < HouseData[houseid][house_value]) return SendClientMessage(playerid, ERROR_COLOUR, "SERVER: You don't have enough money to buy this house.");
+	            new houseid = PlayerData[playerid][E_PLAYER_HOUSE_ID];
+	            if(GetPlayerMoney(playerid) < HouseData[houseid][E_HOUSE_VALUE]) return SendClientMessage(playerid, ERROR_COLOUR, "SERVER: You don't have enough money to buy this house.");
 	            
-	            GivePlayerMoney(playerid, -HouseData[houseid][house_value]);
+	            GivePlayerMoney(playerid, -HouseData[houseid][E_HOUSE_VALUE]);
 	            
 	            UpdateNearbyLandValue(houseid);
 	            
 				new owner[MAX_PLAYER_NAME], name[64], label[128], query[200];
 				format(owner, sizeof(owner), "%s", GetName(playerid));
 				format(name, sizeof(name), "%s's House", GetName(playerid));
-				format(label, sizeof(label), "%s\nValue: $%i", name, HouseData[houseid][house_value]);
+				format(label, sizeof(label), "%s\nValue: $%i", name, HouseData[houseid][E_HOUSE_VALUE]);
 				
-				HouseData[houseid][house_owner] = owner;
-				HouseData[houseid][house_name] = name;
+				HouseData[houseid][E_HOUSE_OWNER] = owner;
+				HouseData[houseid][E_HOUSE_NAME] = name;
 				
-				UpdateDynamic3DTextLabelText(HouseData[houseid][house_label], LABEL_COLOUR, label);
+				UpdateDynamic3DTextLabelText(HouseData[houseid][E_HOUSE_LABEL], LABEL_COLOUR, label);
 				
-				DestroyDynamicMapIcon(HouseData[houseid][house_mapicon]);
-				HouseData[houseid][house_mapicon] = CreateDynamicMapIcon(HouseData[houseid][house_extx], HouseData[houseid][house_exty], HouseData[houseid][house_extz], 32, -1, -1, -1, -1, 250.0);
+				DestroyDynamicMapIcon(HouseData[houseid][E_HOUSE_MAPICON]);
+				HouseData[houseid][E_HOUSE_MAPICON] = CreateDynamicMapIcon(HouseData[houseid][E_HOUSE_EXT_X], HouseData[houseid][E_HOUSE_EXT_Y], HouseData[houseid][E_HOUSE_EXT_Z], 32, -1, -1, -1, -1, 250.0);
 				
-				SetPlayerPos(playerid, HouseData[houseid][house_exitx], HouseData[houseid][house_exity], HouseData[houseid][house_exitz]);
-				SetPlayerFacingAngle(playerid, HouseData[houseid][house_exita] + 180);
+				SetPlayerPos(playerid, HouseData[houseid][E_HOUSE_EXIT_X], HouseData[houseid][E_HOUSE_EXIT_Y], HouseData[houseid][E_HOUSE_EXIT_Z]);
+				SetPlayerFacingAngle(playerid, HouseData[houseid][E_HOUSE_EXIT_A] + 180);
 				SetCameraBehindPlayer(playerid);
 
 				format(query, sizeof(query), "UPDATE `HOUSES` SET `OWNER` = '%q', `NAME` = '%q' WHERE `ID` = '%i'", owner, name, houseid);
-				database_result = db_query(server_database, query);
-				db_free_result(database_result);
+				gDatabaseResult = db_query(gServerDatabase, query);
+				db_free_result(gDatabaseResult);
 	        }
 	        return 1;
 		}
@@ -411,15 +440,15 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 	        {
 	            if(strlen(inputtext) < 3 || strlen(inputtext) > 32) return SendClientMessage(playerid, ERROR_COLOUR, "SERVER: The password must be from 3-32 characters long.");
 
-	            new houseid = PlayerData[playerid][player_houseid], query[128], field[64];
+	            new houseid = PlayerData[playerid][E_PLAYER_HOUSE_ID], query[128], field[64];
 	            format(query, sizeof(query), "SELECT `PASS` FROM `HOUSES` WHERE `ID` = '%i'", houseid);
-				database_result = db_query(server_database, query);
-		     	if(db_num_rows(database_result))
+				gDatabaseResult = db_query(gServerDatabase, query);
+		     	if(db_num_rows(gDatabaseResult))
 				{
-					db_get_field_assoc(database_result, "PASS", field, sizeof(field));
+					db_get_field_assoc(gDatabaseResult, "PASS", field, sizeof(field));
 			    	bcrypt_verify(playerid, "VerifyHousePassword", inputtext, field);
 				}
-				db_free_result(database_result);
+				db_free_result(gDatabaseResult);
 	        }
 	        return 1;
 	    }
@@ -444,7 +473,7 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 	                case 3:
 	                {
 	                    new string[128];
-	                    format(string, sizeof(string), "{FFFFFF}Do you want to sell your house for $%i?", HouseData[PlayerData[playerid][player_houseid]][house_value]);
+	                    format(string, sizeof(string), "{FFFFFF}Do you want to sell your house for $%i?", HouseData[PlayerData[playerid][E_PLAYER_HOUSE_ID]][E_HOUSE_VALUE]);
 	                    return ShowPlayerDialog(playerid, SELL_DIALOG, DIALOG_STYLE_MSGBOX, "{FFFFFF}Sell House", string, "Yes", "No");
 	                }
 				}
@@ -457,17 +486,17 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 	        {
 	            if(strlen(inputtext) < 1 || strlen(inputtext) > 64) return SendClientMessage(playerid, ERROR_COLOUR, "SERVER: Your house name must be from 1-64 characters long.");
 	            
-	            new houseid = PlayerData[playerid][player_houseid], name[64], query[128], label[128];
+	            new houseid = PlayerData[playerid][E_PLAYER_HOUSE_ID], name[64], query[128], label[128];
 	            format(name, sizeof(name), "%s", inputtext);
 	            
-	            HouseData[houseid][house_name] = name;
+	            HouseData[houseid][E_HOUSE_NAME] = name;
 	            
-	            format(label, sizeof(label), "%s\nValue: $%i", HouseData[houseid][house_name], HouseData[houseid][house_value]);
-				UpdateDynamic3DTextLabelText(HouseData[houseid][house_label], LABEL_COLOUR, label);
+	            format(label, sizeof(label), "%s\nValue: $%i", HouseData[houseid][E_HOUSE_NAME], HouseData[houseid][E_HOUSE_VALUE]);
+				UpdateDynamic3DTextLabelText(HouseData[houseid][E_HOUSE_LABEL], LABEL_COLOUR, label);
 
-				format(query, sizeof(query), "UPDATE `HOUSES` SET `NAME` = '%q' WHERE `ID` = '%i'", HouseData[houseid][house_name], houseid);
-				database_result = db_query(server_database, query);
-				db_free_result(database_result);
+				format(query, sizeof(query), "UPDATE `HOUSES` SET `NAME` = '%q' WHERE `ID` = '%i'", HouseData[houseid][E_HOUSE_NAME], houseid);
+				gDatabaseResult = db_query(gServerDatabase, query);
+				db_free_result(gDatabaseResult);
 				
 				GameTextForPlayer(playerid, "~g~Name Changed!", 3000, 5);
 	        }
@@ -479,7 +508,7 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 	        {
 	            if(strlen(inputtext) < 3 || strlen(inputtext) > 32) return SendClientMessage(playerid, ERROR_COLOUR, "SERVER: Your house password must be from 3-32 characters long.");
 
-				bcrypt_hash(playerid, "EncryptHousePassword", inputtext, 12, "i", PlayerData[playerid][player_houseid]);
+				bcrypt_hash(playerid, "EncryptHousePassword", inputtext, 12, "i", PlayerData[playerid][E_PLAYER_HOUSE_ID]);
 	        }
 	        return 1;
 		}
@@ -492,7 +521,7 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 	            {
 	                case 0:
 	                {
-	                    format(string, sizeof(string), "{FFFFFF}Funds: $%i", HouseData[PlayerData[playerid][player_houseid]][house_safe]);
+	                    format(string, sizeof(string), "{FFFFFF}Funds: $%i", HouseData[PlayerData[playerid][E_PLAYER_HOUSE_ID]][E_HOUSE_SAFE]);
 	                    return ShowPlayerDialog(playerid, BALANCE_DIALOG, DIALOG_STYLE_LIST, "{FFFFFF}Balance", string, "Back", "Close");
 	                }
 	                case 1:
@@ -502,7 +531,7 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 	                }
 	                case 2:
 	                {
-	                    format(string, sizeof(string), "{FFFFFF}Withdraw (Funds: $%i)", HouseData[PlayerData[playerid][player_houseid]][house_safe]);
+	                    format(string, sizeof(string), "{FFFFFF}Withdraw (Funds: $%i)", HouseData[PlayerData[playerid][E_PLAYER_HOUSE_ID]][E_HOUSE_SAFE]);
 	                    return ShowPlayerDialog(playerid, WITHDRAW_DIALOG, DIALOG_STYLE_INPUT, string, "{FFFFFF}How much would you like to withdraw?", "Enter", "Back");
 	                }
 				}
@@ -526,12 +555,12 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 	            
 	            GivePlayerMoney(playerid, -strval(inputtext));
 	            
-	            new houseid = PlayerData[playerid][player_houseid], query[128];
-	            HouseData[houseid][house_safe] = (HouseData[houseid][house_safe] + strval(inputtext));
+	            new houseid = PlayerData[playerid][E_PLAYER_HOUSE_ID], query[128];
+	            HouseData[houseid][E_HOUSE_SAFE] = (HouseData[houseid][E_HOUSE_SAFE] + strval(inputtext));
 	            
-				format(query, sizeof(query), "UPDATE `HOUSES` SET `SAFE` = '%i' WHERE `ID` = '%i'", HouseData[houseid][house_safe], houseid);
-				database_result = db_query(server_database, query);
-				db_free_result(database_result);
+				format(query, sizeof(query), "UPDATE `HOUSES` SET `SAFE` = '%i' WHERE `ID` = '%i'", HouseData[houseid][E_HOUSE_SAFE], houseid);
+				gDatabaseResult = db_query(gServerDatabase, query);
+				db_free_result(gDatabaseResult);
 	            
 	            return GameTextForPlayer(playerid, "~g~Money Deposited!", 3000, 5);
 	        }
@@ -547,17 +576,17 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 	        {
 	            if(!IsNumeric(inputtext) || strval(inputtext) < 1) return SendClientMessage(playerid, ERROR_COLOUR, "SERVER: You must input a number greater than 0.");
 	            
-	            new houseid = PlayerData[playerid][player_houseid];
-	            if(strval(inputtext) > HouseData[houseid][house_safe]) return SendClientMessage(playerid, ERROR_COLOUR, "SERVER: You do not have that much money in your safe.");
+	            new houseid = PlayerData[playerid][E_PLAYER_HOUSE_ID];
+	            if(strval(inputtext) > HouseData[houseid][E_HOUSE_SAFE]) return SendClientMessage(playerid, ERROR_COLOUR, "SERVER: You do not have that much money in your safe.");
 
 	            GivePlayerMoney(playerid, strval(inputtext));
 
-	            HouseData[houseid][house_safe] = (HouseData[houseid][house_safe] - strval(inputtext));
+	            HouseData[houseid][E_HOUSE_SAFE] = (HouseData[houseid][E_HOUSE_SAFE] - strval(inputtext));
 
 	            new query[128];
-				format(query, sizeof(query), "UPDATE `HOUSES` SET `SAFE` = '%i' WHERE `ID` = '%i'", HouseData[houseid][house_safe], houseid);
-				database_result = db_query(server_database, query);
-				db_free_result(database_result);
+				format(query, sizeof(query), "UPDATE `HOUSES` SET `SAFE` = '%i' WHERE `ID` = '%i'", HouseData[houseid][E_HOUSE_SAFE], houseid);
+				gDatabaseResult = db_query(gServerDatabase, query);
+				db_free_result(gDatabaseResult);
 
 	            return GameTextForPlayer(playerid, "~g~Money Withdrawn!", 3000, 5);
 	        }
@@ -570,8 +599,8 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 		{
 	        if(response)
 	        {
-	            new houseid = PlayerData[playerid][player_houseid];
-	            GivePlayerMoney(playerid, (HouseData[houseid][house_value] + HouseData[houseid][house_safe]));
+	            new houseid = PlayerData[playerid][E_PLAYER_HOUSE_ID];
+	            GivePlayerMoney(playerid, (HouseData[houseid][E_HOUSE_VALUE] + HouseData[houseid][E_HOUSE_SAFE]));
 	            
 	            GameTextForPlayer(playerid, "~g~House Sold!", 3000, 5);
 	            
@@ -579,19 +608,19 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 				
 				format(owner, sizeof(owner), "~");
 				format(name, sizeof(name), "4-Sale");
-				format(label, sizeof(label), "%s\nPrice: $%i", name, HouseData[houseid][house_value]);
+				format(label, sizeof(label), "%s\nPrice: $%i", name, HouseData[houseid][E_HOUSE_VALUE]);
 				
-				HouseData[houseid][house_owner] = owner;
-				HouseData[houseid][house_name] = name;
+				HouseData[houseid][E_HOUSE_OWNER] = owner;
+				HouseData[houseid][E_HOUSE_NAME] = name;
 
 				format(query, sizeof(query), "UPDATE `HOUSES` SET `OWNER` = '%q', `NAME` = '%q', `SAFE` = '0' WHERE `ID` = '%i'", owner, name, houseid);
-				database_result = db_query(server_database, query);
-				db_free_result(database_result);
+				gDatabaseResult = db_query(gServerDatabase, query);
+				db_free_result(gDatabaseResult);
 				
-				DestroyDynamicMapIcon(HouseData[houseid][house_mapicon]);
-				HouseData[houseid][house_mapicon] = CreateDynamicMapIcon(HouseData[houseid][house_extx], HouseData[houseid][house_exty], HouseData[houseid][house_extz], 31, -1, -1, -1, -1, 250.0);
+				DestroyDynamicMapIcon(HouseData[houseid][E_HOUSE_MAPICON]);
+				HouseData[houseid][E_HOUSE_MAPICON] = CreateDynamicMapIcon(HouseData[houseid][E_HOUSE_EXT_X], HouseData[houseid][E_HOUSE_EXT_Y], HouseData[houseid][E_HOUSE_EXT_Z], 31, -1, -1, -1, -1, 250.0);
 
-				return UpdateDynamic3DTextLabelText(HouseData[houseid][house_label], LABEL_COLOUR, label);
+				return UpdateDynamic3DTextLabelText(HouseData[houseid][E_HOUSE_LABEL], LABEL_COLOUR, label);
 	        }
 		}
 	}
@@ -604,44 +633,44 @@ public OnPlayerEnterDynamicCP(playerid, checkpointid)
     {
 		for(new i = 0; i < MAX_HOUSES; i++)
 		{
-	    	if(HouseData[i][house_active] == true)
+	    	if(HouseData[i][E_HOUSE_IS_ACTIVE] == true)
 	    	{
-	   	    	if(checkpointid == HouseData[i][house_entercp])
+	   	    	if(checkpointid == HouseData[i][E_HOUSE_ENTER_CP])
 	   	    	{
 	   	    	    new string[64];
-	   	    	    if(!strcmp(HouseData[i][house_owner], "~", true))
+	   	    	    if(!strcmp(HouseData[i][E_HOUSE_OWNER], "~", true))
 			   		{
-			   		    PlayerData[playerid][player_houseid] = i;
+			   		    PlayerData[playerid][E_PLAYER_HOUSE_ID] = i;
 
-			   		    format(string, sizeof(string), "{FFFFFF}4-Sale: $%i", HouseData[i][house_value]);
+			   		    format(string, sizeof(string), "{FFFFFF}4-Sale: $%i", HouseData[i][E_HOUSE_VALUE]);
 					   	ShowPlayerDialog(playerid, BUY_DIALOG, DIALOG_STYLE_MSGBOX, string, "{FFFFFF}Would you like to buy or preview this house?", "Buy", "Preview");
 					}
-					else if(!strcmp(HouseData[i][house_owner], GetName(playerid), true))
+					else if(!strcmp(HouseData[i][E_HOUSE_OWNER], GetName(playerid), true))
 					{
-					    SetPlayerInterior(playerid, HouseData[i][house_intinterior]);
-					    SetPlayerVirtualWorld(playerid, HouseData[i][house_intworld]);
-	   	    	    	SetPlayerPos(playerid, HouseData[i][house_enterx], HouseData[i][house_entery], HouseData[i][house_enterz]);
-	   	    	    	SetPlayerFacingAngle(playerid, HouseData[i][house_entera]);
+					    SetPlayerInterior(playerid, HouseData[i][E_HOUSE_INT_INTERIOR]);
+					    SetPlayerVirtualWorld(playerid, HouseData[i][E_HOUSE_INT_WORLD]);
+	   	    	    	SetPlayerPos(playerid, HouseData[i][E_HOUSE_ENTER_X], HouseData[i][E_HOUSE_ENTER_Y], HouseData[i][E_HOUSE_ENTER_Z]);
+	   	    	    	SetPlayerFacingAngle(playerid, HouseData[i][E_HOUSE_ENTER_A]);
 	   	    	    	SetCameraBehindPlayer(playerid);
 
 	   	    	    	SendClientMessage(playerid, NOTICE_COLOUR, "SERVER: Type /menu to access the list of house features.");
 					}
 					else
 					{
-			   		    PlayerData[playerid][player_houseid] = i;
+			   		    PlayerData[playerid][E_PLAYER_HOUSE_ID] = i;
 
-					    format(string, sizeof(string), "{FFFFFF}Owner: %s", HouseData[i][house_owner]);
+					    format(string, sizeof(string), "{FFFFFF}Owner: %s", HouseData[i][E_HOUSE_OWNER]);
 					    ShowPlayerDialog(playerid, ACCESS_DIALOG, DIALOG_STYLE_PASSWORD, string, "{FFFFFF}Please enter the password to gain access:", "Enter", "Cancel");
 					}
 					return 1;
 	   	    	}
-	   	    	else if(checkpointid == HouseData[i][house_exitcp])
+	   	    	else if(checkpointid == HouseData[i][E_HOUSE_EXIT_CP])
 	   	    	{
-					SetPlayerInterior(playerid, HouseData[i][house_extinterior]);
-					SetPlayerVirtualWorld(playerid, HouseData[i][house_extworld]);
+					SetPlayerInterior(playerid, HouseData[i][E_HOUSE_EXT_INTERIOR]);
+					SetPlayerVirtualWorld(playerid, HouseData[i][E_HOUSE_EXT_WORLD]);
 
-	   	    	    SetPlayerPos(playerid, HouseData[i][house_exitx], HouseData[i][house_exity], HouseData[i][house_exitz]);
-	   	    	    SetPlayerFacingAngle(playerid, HouseData[i][house_exita]);
+	   	    	    SetPlayerPos(playerid, HouseData[i][E_HOUSE_EXIT_X], HouseData[i][E_HOUSE_EXIT_Y], HouseData[i][E_HOUSE_EXIT_Z]);
+	   	    	    SetPlayerFacingAngle(playerid, HouseData[i][E_HOUSE_EXIT_A]);
 	   	    	    return SetCameraBehindPlayer(playerid);
 	   	    	}
    	    	}
@@ -657,8 +686,8 @@ public EncryptHousePassword(playerid, houseid)
 
 	new query[128];
 	format(query, sizeof(query), "UPDATE `HOUSES` SET `PASS` = '%s' WHERE `ID` = '%i'", password, houseid);
-	database_result = db_query(server_database, query);
-	db_free_result(database_result);
+	gDatabaseResult = db_query(gServerDatabase, query);
+	db_free_result(gDatabaseResult);
 	
 	return GameTextForPlayer(playerid, "~g~Password Changed!", 3000, 5);
 }
@@ -667,11 +696,11 @@ public VerifyHousePassword(playerid, bool:success)
 {
  	if(success)
 	{
-	    new houseid = PlayerData[playerid][player_houseid];
-		SetPlayerInterior(playerid, HouseData[houseid][house_intinterior]);
-		SetPlayerVirtualWorld(playerid, HouseData[houseid][house_intworld]);
-   	  	SetPlayerPos(playerid, HouseData[houseid][house_enterx], HouseData[houseid][house_entery], HouseData[houseid][house_enterz]);
-   	   	SetPlayerFacingAngle(playerid, HouseData[houseid][house_entera]);
+	    new houseid = PlayerData[playerid][E_PLAYER_HOUSE_ID];
+		SetPlayerInterior(playerid, HouseData[houseid][E_HOUSE_INT_INTERIOR]);
+		SetPlayerVirtualWorld(playerid, HouseData[houseid][E_HOUSE_INT_WORLD]);
+   	  	SetPlayerPos(playerid, HouseData[houseid][E_HOUSE_ENTER_X], HouseData[houseid][E_HOUSE_ENTER_Y], HouseData[houseid][E_HOUSE_ENTER_Z]);
+   	   	SetPlayerFacingAngle(playerid, HouseData[houseid][E_HOUSE_ENTER_A]);
    	 	return SetCameraBehindPlayer(playerid);
  	}
 	else
@@ -680,6 +709,10 @@ public VerifyHousePassword(playerid, bool:success)
  	}
 	return 1;
 }
+
+// -----------------------------------------------------------------------------
+// Commands
+// -----------------------------------------------------------------------------
 
 CMD:hcmds(playerid, params[])
 {
@@ -690,7 +723,7 @@ CMD:hcmds(playerid, params[])
 CMD:menu(playerid, params[])
 {
 	if(GetOwnedHouseID(playerid) == -1) return SendClientMessage(playerid, ERROR_COLOUR, "SERVER: You must be inside an owned house to use /menu.");
-	PlayerData[playerid][player_houseid] = GetOwnedHouseID(playerid);
+	PlayerData[playerid][E_PLAYER_HOUSE_ID] = GetOwnedHouseID(playerid);
 	return ShowPlayerDialog(playerid, MENU_DIALOG, DIALOG_STYLE_LIST, "{FFFFFF}House Menu", "{FFFFFF}Access Safe\nChange Name\nChange Password\nSell House", "Select", "Cancel");
 }
 
@@ -698,8 +731,8 @@ CMD:sellhouse(playerid, params[])
 {
 	new houseid = GetOwnedHouseID(playerid);
 	if(houseid == -1) return SendClientMessage(playerid, ERROR_COLOUR, "SERVER: You must be inside an owned house to sell it.");
-	if((gettime() - 5) < PlayerData[playerid][player_spam]) return SendClientMessage(playerid, ERROR_COLOUR, "SERVER: Please wait 5 seconds before using this command again.");
-    PlayerData[playerid][player_spam] = gettime();
+	if((gettime() - 5) < PlayerData[playerid][E_PLAYER_SPAM]) return SendClientMessage(playerid, ERROR_COLOUR, "SERVER: Please wait 5 seconds before using this command again.");
+    PlayerData[playerid][E_PLAYER_SPAM] = gettime();
     
 	new targetid, price;
 	if(sscanf(params, "ui", targetid, price)) return SendClientMessage(playerid, ERROR_COLOUR, "USAGE: /sellhouse [player] [price]");
@@ -708,13 +741,13 @@ CMD:sellhouse(playerid, params[])
 	if(targetid == playerid) return SendClientMessage(playerid, ERROR_COLOUR, "SERVER: You cannot sell your house to yourself.");
 	if(price < 1) return SendClientMessage(playerid, ERROR_COLOUR, "SERVER: The sale price must be greater than 0.");
 	
-	PlayerData[targetid][player_salehouse] = houseid;
-	PlayerData[targetid][player_saleprice] = price;
-	PlayerData[targetid][player_saleowner] = playerid;
+	PlayerData[targetid][E_PLAYER_SALE_HOUSE] = houseid;
+	PlayerData[targetid][E_PLAYER_SALE_PRICE] = price;
+	PlayerData[targetid][E_PLAYER_SALE_OWNER] = playerid;
 
-	PlayerData[targetid][player_saleactive] = true;
+	PlayerData[targetid][E_PLAYER_SALE_ACTIVE] = true;
 	
-	PlayerData[playerid][player_saleto] = targetid;
+	PlayerData[playerid][E_PLAYER_SALE_TO] = targetid;
 	
 	new string[200];
 	format(string, sizeof(string), "SERVER: You have offered %s (%i) your house for $%i. Please wait for their response.", GetName(targetid), targetid, price);
@@ -726,28 +759,28 @@ CMD:sellhouse(playerid, params[])
 
 CMD:accepthouse(playerid, params[])
 {
-	if(PlayerData[playerid][player_saleactive] == false) return SendClientMessage(playerid, ERROR_COLOUR, "SERVER: You have not been offered any houses to purchase.");
+	if(PlayerData[playerid][E_PLAYER_SALE_ACTIVE] == false) return SendClientMessage(playerid, ERROR_COLOUR, "SERVER: You have not been offered any houses to purchase.");
 	
-	new houseid = PlayerData[playerid][player_salehouse], price = PlayerData[playerid][player_saleprice], targetid = PlayerData[playerid][player_saleowner];
+	new houseid = PlayerData[playerid][E_PLAYER_SALE_HOUSE], price = PlayerData[playerid][E_PLAYER_SALE_PRICE], targetid = PlayerData[playerid][E_PLAYER_SALE_OWNER];
 	if(targetid == INVALID_PLAYER_ID)
 	{
-		PlayerData[playerid][player_saleactive] = false;
+		PlayerData[playerid][E_PLAYER_SALE_ACTIVE] = false;
 		return SendClientMessage(playerid, ERROR_COLOUR, "SERVER: That player has recently disconnected.");
 	}
-	if(PlayerData[targetid][player_saleto] != playerid)
+	if(PlayerData[targetid][E_PLAYER_SALE_TO] != playerid)
 	{
-		PlayerData[playerid][player_saleactive] = false;
+		PlayerData[playerid][E_PLAYER_SALE_ACTIVE] = false;
 		return SendClientMessage(playerid, ERROR_COLOUR, "SERVER: That player has offered the house to someone else.");
 	}
-	if(GetPlayerMoney(playerid) < PlayerData[playerid][player_saleprice]) return SendClientMessage(playerid, ERROR_COLOUR, "SERVER: You don't have enough money to accept that offer.");
+	if(GetPlayerMoney(playerid) < PlayerData[playerid][E_PLAYER_SALE_PRICE]) return SendClientMessage(playerid, ERROR_COLOUR, "SERVER: You don't have enough money to accept that offer.");
 	
 	GivePlayerMoney(playerid, -price);
 	GivePlayerMoney(targetid, price);
 	
 	UpdateNearbyLandValue(houseid);
 	
-	PlayerData[playerid][player_saleactive] = false;
-	PlayerData[targetid][player_saleto] = INVALID_PLAYER_ID;
+	PlayerData[playerid][E_PLAYER_SALE_ACTIVE] = false;
+	PlayerData[targetid][E_PLAYER_SALE_TO] = INVALID_PLAYER_ID;
 
 	new query[128], label[128], name[64];
 	GameTextForPlayer(playerid, "~g~Offer Accepted!", 3000, 5);
@@ -755,39 +788,39 @@ CMD:accepthouse(playerid, params[])
 
 	format(name, sizeof(name), "%s's House", GetName(playerid));
 	
-	HouseData[houseid][house_owner] = GetName(playerid);
-	HouseData[houseid][house_name] = name;
+	HouseData[houseid][E_HOUSE_OWNER] = GetName(playerid);
+	HouseData[houseid][E_HOUSE_NAME] = name;
 	
-	GivePlayerMoney(targetid, HouseData[houseid][house_safe]);
+	GivePlayerMoney(targetid, HouseData[houseid][E_HOUSE_SAFE]);
 	
-	HouseData[houseid][house_safe] = 0;
+	HouseData[houseid][E_HOUSE_SAFE] = 0;
 
-	format(query, sizeof(query), "UPDATE `HOUSES` SET `OWNER` = '%q', `NAME` = '%q', `SAFE` = '%i' WHERE `ID` = '%i'", GetName(playerid), name, HouseData[houseid][house_safe], houseid);
-	database_result = db_query(server_database, query);
-	db_free_result(database_result);
+	format(query, sizeof(query), "UPDATE `HOUSES` SET `OWNER` = '%q', `NAME` = '%q', `SAFE` = '%i' WHERE `ID` = '%i'", GetName(playerid), name, HouseData[houseid][E_HOUSE_SAFE], houseid);
+	gDatabaseResult = db_query(gServerDatabase, query);
+	db_free_result(gDatabaseResult);
 
-	format(label, sizeof(label), "%s\nValue: $%i", name, HouseData[houseid][house_value]);
-	return UpdateDynamic3DTextLabelText(HouseData[houseid][house_label], LABEL_COLOUR, label);
+	format(label, sizeof(label), "%s\nValue: $%i", name, HouseData[houseid][E_HOUSE_VALUE]);
+	return UpdateDynamic3DTextLabelText(HouseData[houseid][E_HOUSE_LABEL], LABEL_COLOUR, label);
 }
 
 CMD:declinehouse(playerid, params[])
 {
-	if(PlayerData[playerid][player_saleactive] == false) return SendClientMessage(playerid, ERROR_COLOUR, "SERVER: You have not been offered any houses to decline.");
+	if(PlayerData[playerid][E_PLAYER_SALE_ACTIVE] == false) return SendClientMessage(playerid, ERROR_COLOUR, "SERVER: You have not been offered any houses to decline.");
 	
-	new targetid = PlayerData[playerid][player_saleowner];
+	new targetid = PlayerData[playerid][E_PLAYER_SALE_OWNER];
 	if(targetid == INVALID_PLAYER_ID)
 	{
-		PlayerData[playerid][player_saleactive] = false;
+		PlayerData[playerid][E_PLAYER_SALE_ACTIVE] = false;
 		return SendClientMessage(playerid, ERROR_COLOUR, "SERVER: That player has recently disconnected.");
 	}
-	if(PlayerData[targetid][player_saleto] != playerid)
+	if(PlayerData[targetid][E_PLAYER_SALE_TO] != playerid)
 	{
-		PlayerData[playerid][player_saleactive] = false;
+		PlayerData[playerid][E_PLAYER_SALE_ACTIVE] = false;
 		return SendClientMessage(playerid, ERROR_COLOUR, "SERVER: That player has offered the house to someone else.");
 	}
 
-	PlayerData[playerid][player_saleactive] = false;
-	PlayerData[targetid][player_saleto] = INVALID_PLAYER_ID;
+	PlayerData[playerid][E_PLAYER_SALE_ACTIVE] = false;
+	PlayerData[targetid][E_PLAYER_SALE_TO] = INVALID_PLAYER_ID;
 
 	GameTextForPlayer(playerid, "~r~Offer Declined!", 3000, 5);
 	return GameTextForPlayer(targetid, "~r~Offer Declined!", 3000, 5);
@@ -805,127 +838,127 @@ CMD:createhouse(playerid, params[])
 
 	if(!strcmp(type, "house1", true))//1 Story House
 	{
-		HouseData[houseid][house_value] = HOUSE_ONE_PRICE;
+		HouseData[houseid][E_HOUSE_VALUE] = HOUSE_ONE_PRICE;
 
-		HouseData[houseid][house_intx] = 2196.84;
-		HouseData[houseid][house_inty] = -1204.36;
-		HouseData[houseid][house_intz] = 1049.02;
+		HouseData[houseid][E_HOUSE_INT_X] = 2196.84;
+		HouseData[houseid][E_HOUSE_INT_Y] = -1204.36;
+		HouseData[houseid][E_HOUSE_INT_Z] = 1049.02;
 		
-		HouseData[houseid][house_enterx] = 2193.9001;
-		HouseData[houseid][house_entery] = -1202.4185;
-		HouseData[houseid][house_enterz] = 1049.0234;
-		HouseData[houseid][house_entera] = 91.9386;
+		HouseData[houseid][E_HOUSE_ENTER_X] = 2193.9001;
+		HouseData[houseid][E_HOUSE_ENTER_Y] = -1202.4185;
+		HouseData[houseid][E_HOUSE_ENTER_Z] = 1049.0234;
+		HouseData[houseid][E_HOUSE_ENTER_A] = 91.9386;
 		
-		HouseData[houseid][house_intinterior] = 6;
-		HouseData[houseid][house_intworld] = houseid;
+		HouseData[houseid][E_HOUSE_INT_INTERIOR] = 6;
+		HouseData[houseid][E_HOUSE_INT_WORLD] = houseid;
 	}
 	else if(!strcmp(type, "house2", true))//2 Story House
 	{
-  		HouseData[houseid][house_value] = HOUSE_TWO_PRICE;
+  		HouseData[houseid][E_HOUSE_VALUE] = HOUSE_TWO_PRICE;
 
-		HouseData[houseid][house_intx] = 2317.77;
-		HouseData[houseid][house_inty] = -1026.76;
-		HouseData[houseid][house_intz] = 1050.21;
+		HouseData[houseid][E_HOUSE_INT_X] = 2317.77;
+		HouseData[houseid][E_HOUSE_INT_Y] = -1026.76;
+		HouseData[houseid][E_HOUSE_INT_Z] = 1050.21;
 
-		HouseData[houseid][house_enterx] = 2320.0730;
-		HouseData[houseid][house_entery] = -1023.9533;
-		HouseData[houseid][house_enterz] = 1050.2109;
-		HouseData[houseid][house_entera] = 358.4915;
+		HouseData[houseid][E_HOUSE_ENTER_X] = 2320.0730;
+		HouseData[houseid][E_HOUSE_ENTER_Y] = -1023.9533;
+		HouseData[houseid][E_HOUSE_ENTER_Z] = 1050.2109;
+		HouseData[houseid][E_HOUSE_ENTER_A] = 358.4915;
 
-		HouseData[houseid][house_intinterior] = 9;
-		HouseData[houseid][house_intworld] = houseid;
+		HouseData[houseid][E_HOUSE_INT_INTERIOR] = 9;
+		HouseData[houseid][E_HOUSE_INT_WORLD] = houseid;
 	}
 	else if(!strcmp(type, "mansion1", true))//Small Mansion
 	{
-		HouseData[houseid][house_value] = MANSION_ONE_PRICE;
+		HouseData[houseid][E_HOUSE_VALUE] = MANSION_ONE_PRICE;
 
-		HouseData[houseid][house_intx] = 2324.41;
-		HouseData[houseid][house_inty] = -1149.54;
-		HouseData[houseid][house_intz] = 1050.71;
+		HouseData[houseid][E_HOUSE_INT_X] = 2324.41;
+		HouseData[houseid][E_HOUSE_INT_Y] = -1149.54;
+		HouseData[houseid][E_HOUSE_INT_Z] = 1050.71;
 
-		HouseData[houseid][house_enterx] = 2324.4490;
-		HouseData[houseid][house_entery] = -1145.2841;
-		HouseData[houseid][house_enterz] = 1050.7101;
-		HouseData[houseid][house_entera] = 357.5873;
+		HouseData[houseid][E_HOUSE_ENTER_X] = 2324.4490;
+		HouseData[houseid][E_HOUSE_ENTER_Y] = -1145.2841;
+		HouseData[houseid][E_HOUSE_ENTER_Z] = 1050.7101;
+		HouseData[houseid][E_HOUSE_ENTER_A] = 357.5873;
 
-		HouseData[houseid][house_intinterior] = 12;
-		HouseData[houseid][house_intworld] = houseid;
+		HouseData[houseid][E_HOUSE_INT_INTERIOR] = 12;
+		HouseData[houseid][E_HOUSE_INT_WORLD] = houseid;
 	}
 	else if(!strcmp(type, "mansion2", true))//Large Mansion
 	{
-		HouseData[houseid][house_value] = MANSION_TWO_PRICE;
+		HouseData[houseid][E_HOUSE_VALUE] = MANSION_TWO_PRICE;
 
-		HouseData[houseid][house_intx] = 140.28;
-		HouseData[houseid][house_inty] = 1365.92;
-		HouseData[houseid][house_intz] = 1083.85;
+		HouseData[houseid][E_HOUSE_INT_X] = 140.28;
+		HouseData[houseid][E_HOUSE_INT_Y] = 1365.92;
+		HouseData[houseid][E_HOUSE_INT_Z] = 1083.85;
 
-		HouseData[houseid][house_enterx] = 140.1788;
-		HouseData[houseid][house_entery] = 1369.1936;
-		HouseData[houseid][house_enterz] = 1083.8641;
-		HouseData[houseid][house_entera] = 359.2263;
+		HouseData[houseid][E_HOUSE_ENTER_X] = 140.1788;
+		HouseData[houseid][E_HOUSE_ENTER_Y] = 1369.1936;
+		HouseData[houseid][E_HOUSE_ENTER_Z] = 1083.8641;
+		HouseData[houseid][E_HOUSE_ENTER_A] = 359.2263;
 
-		HouseData[houseid][house_intinterior] = 5;
-		HouseData[houseid][house_intworld] = houseid;
+		HouseData[houseid][E_HOUSE_INT_INTERIOR] = 5;
+		HouseData[houseid][E_HOUSE_INT_WORLD] = houseid;
 	}
 	else if(!strcmp(type, "apartment", true))//Apartment
 	{
-		HouseData[houseid][house_value] = APARTMENT_PRICE;
+		HouseData[houseid][E_HOUSE_VALUE] = APARTMENT_PRICE;
 
-		HouseData[houseid][house_intx] = 225.7121;
-		HouseData[houseid][house_inty] = 1021.4438;
-		HouseData[houseid][house_intz] = 1084.0177;
+		HouseData[houseid][E_HOUSE_INT_X] = 225.7121;
+		HouseData[houseid][E_HOUSE_INT_Y] = 1021.4438;
+		HouseData[houseid][E_HOUSE_INT_Z] = 1084.0177;
 
-		HouseData[houseid][house_enterx] = 225.8993;
-		HouseData[houseid][house_entery] = 1023.9148;
-		HouseData[houseid][house_enterz] = 1084.0078;
-		HouseData[houseid][house_entera] = 358.4921;
+		HouseData[houseid][E_HOUSE_ENTER_X] = 225.8993;
+		HouseData[houseid][E_HOUSE_ENTER_Y] = 1023.9148;
+		HouseData[houseid][E_HOUSE_ENTER_Z] = 1084.0078;
+		HouseData[houseid][E_HOUSE_ENTER_A] = 358.4921;
 
-		HouseData[houseid][house_intinterior] = 7;
-		HouseData[houseid][house_intworld] = houseid;
+		HouseData[houseid][E_HOUSE_INT_INTERIOR] = 7;
+		HouseData[houseid][E_HOUSE_INT_WORLD] = houseid;
 	}
 	else return SendClientMessage(playerid, ERROR_COLOUR, "SERVER: Invalid house type. Must be: house1/house2/mansion1/mansion2/apartment");
 	
 	format(owner, sizeof(owner), "~");
 	format(password, sizeof(password), "$2y$12$1h2ra6euo5IoIGlVWgvnN.kIOiImlQRnML7Zw/GDZ6Ogb89kA9Lpe");//Randomized Bcrypt Password
-	format(name, sizeof(name), "4-Sale", HouseData[houseid][house_value]);
-	format(label, sizeof(label), "%s\nPrice: $%i", name, HouseData[houseid][house_value]);
+	format(name, sizeof(name), "4-Sale", HouseData[houseid][E_HOUSE_VALUE]);
+	format(label, sizeof(label), "%s\nPrice: $%i", name, HouseData[houseid][E_HOUSE_VALUE]);
 	
 	GetPlayerPos(playerid, pos[0], pos[1], pos[2]);
 	GetPlayerFacingAngle(playerid, pos[3]);
 	
-	HouseData[houseid][house_owner] = owner;
-	HouseData[houseid][house_name] = name;
-	HouseData[houseid][house_safe] = 0;
-	HouseData[houseid][house_extx] = pos[0];
-	HouseData[houseid][house_exty] = pos[1];
-	HouseData[houseid][house_extz] = pos[2];
+	HouseData[houseid][E_HOUSE_OWNER] = owner;
+	HouseData[houseid][E_HOUSE_NAME] = name;
+	HouseData[houseid][E_HOUSE_SAFE] = 0;
+	HouseData[houseid][E_HOUSE_EXT_X] = pos[0];
+	HouseData[houseid][E_HOUSE_EXT_Y] = pos[1];
+	HouseData[houseid][E_HOUSE_EXT_Z] = pos[2];
 	
 	GetPosBehindPlayer(playerid, pos[0], pos[1], 2.0);
 	
-	HouseData[houseid][house_exitx] = pos[0];
-	HouseData[houseid][house_exity] = pos[1];
-	HouseData[houseid][house_exitz] = pos[2];
-	HouseData[houseid][house_exita] = (pos[3] + 180);
+	HouseData[houseid][E_HOUSE_EXIT_X] = pos[0];
+	HouseData[houseid][E_HOUSE_EXIT_Y] = pos[1];
+	HouseData[houseid][E_HOUSE_EXIT_Z] = pos[2];
+	HouseData[houseid][E_HOUSE_EXIT_A] = (pos[3] + 180);
 	
 	SetPlayerPos(playerid, pos[0], pos[1], pos[2]);
 	
-	HouseData[houseid][house_active] = true;
+	HouseData[houseid][E_HOUSE_IS_ACTIVE] = true;
 	
-	HouseData[houseid][house_extinterior] = GetPlayerInterior(playerid);
-	HouseData[houseid][house_extworld] = GetPlayerVirtualWorld(playerid);
+	HouseData[houseid][E_HOUSE_EXT_INTERIOR] = GetPlayerInterior(playerid);
+	HouseData[houseid][E_HOUSE_EXT_WORLD] = GetPlayerVirtualWorld(playerid);
 	
-	HouseData[houseid][house_label] = CreateDynamic3DTextLabel(label, LABEL_COLOUR, HouseData[houseid][house_extx], HouseData[houseid][house_exty], HouseData[houseid][house_extz] + 0.2, 4.0, INVALID_PLAYER_ID, INVALID_VEHICLE_ID, 1, HouseData[houseid][house_extworld], HouseData[houseid][house_extinterior], -1, 4.0);
-	HouseData[houseid][house_mapicon] = CreateDynamicMapIcon(HouseData[houseid][house_extx], HouseData[houseid][house_exty], HouseData[houseid][house_extz], 31, -1, -1, -1, -1, 250.0);
+	HouseData[houseid][E_HOUSE_LABEL] = CreateDynamic3DTextLabel(label, LABEL_COLOUR, HouseData[houseid][E_HOUSE_EXT_X], HouseData[houseid][E_HOUSE_EXT_Y], HouseData[houseid][E_HOUSE_EXT_Z] + 0.2, 4.0, INVALID_PLAYER_ID, INVALID_VEHICLE_ID, 1, HouseData[houseid][E_HOUSE_EXT_WORLD], HouseData[houseid][E_HOUSE_EXT_INTERIOR], -1, 4.0);
+	HouseData[houseid][E_HOUSE_MAPICON] = CreateDynamicMapIcon(HouseData[houseid][E_HOUSE_EXT_X], HouseData[houseid][E_HOUSE_EXT_Y], HouseData[houseid][E_HOUSE_EXT_Z], 31, -1, -1, -1, -1, 250.0);
 	
-	HouseData[houseid][house_entercp] = CreateDynamicCP(HouseData[houseid][house_extx], HouseData[houseid][house_exty], HouseData[houseid][house_extz], 1.0, HouseData[houseid][house_extworld], HouseData[houseid][house_extinterior], -1, 4.0);
-	HouseData[houseid][house_exitcp] = CreateDynamicCP(HouseData[houseid][house_intx], HouseData[houseid][house_inty], HouseData[houseid][house_intz], 1.0, HouseData[houseid][house_intworld], HouseData[houseid][house_intinterior], -1, 4.0);
+	HouseData[houseid][E_HOUSE_ENTER_CP] = CreateDynamicCP(HouseData[houseid][E_HOUSE_EXT_X], HouseData[houseid][E_HOUSE_EXT_Y], HouseData[houseid][E_HOUSE_EXT_Z], 1.0, HouseData[houseid][E_HOUSE_EXT_WORLD], HouseData[houseid][E_HOUSE_EXT_INTERIOR], -1, 4.0);
+	HouseData[houseid][E_HOUSE_EXIT_CP] = CreateDynamicCP(HouseData[houseid][E_HOUSE_INT_X], HouseData[houseid][E_HOUSE_INT_Y], HouseData[houseid][E_HOUSE_INT_Z], 1.0, HouseData[houseid][E_HOUSE_INT_WORLD], HouseData[houseid][E_HOUSE_INT_INTERIOR], -1, 4.0);
 	
 	format(query, sizeof(query),
 "INSERT INTO `HOUSES` (`ID`, `OWNER`, `NAME`, `PASS`, `VALUE`, `SAFE`, `EXTX`, `EXTY`, `EXTZ`, `INTX`, `INTY`, `INTZ`, `ENTERX`, `ENTERY`, `ENTERZ`, `ENTERA`, `EXITX`, `EXITY`, `EXITZ`, `EXITA`, `EXTINTERIOR`, `EXTWORLD`, `INTINTERIOR`, `INTWORLD`) VALUES ('%i', '%q', '%q', '%s', '%i', '%i', '%f', '%f', '%f', '%f', '%f', '%f', '%f', '%f', '%f', '%f', '%f', '%f', '%f', '%f', '%i', '%i', '%i', '%i')",
-houseid, owner, name, password, HouseData[houseid][house_value], HouseData[houseid][house_safe], HouseData[houseid][house_extx], HouseData[houseid][house_exty], HouseData[houseid][house_extz], HouseData[houseid][house_intx], HouseData[houseid][house_inty], HouseData[houseid][house_intz], HouseData[houseid][house_enterx], HouseData[houseid][house_entery], HouseData[houseid][house_enterz], HouseData[houseid][house_entera],
-HouseData[houseid][house_exitx], HouseData[houseid][house_exity], HouseData[houseid][house_exitz], HouseData[houseid][house_exita], HouseData[houseid][house_extinterior], HouseData[houseid][house_extworld], HouseData[houseid][house_intinterior], HouseData[houseid][house_intworld]);
-	database_result = db_query(server_database, query);
-	db_free_result(database_result);
+houseid, owner, name, password, HouseData[houseid][E_HOUSE_VALUE], HouseData[houseid][E_HOUSE_SAFE], HouseData[houseid][E_HOUSE_EXT_X], HouseData[houseid][E_HOUSE_EXT_Y], HouseData[houseid][E_HOUSE_EXT_Z], HouseData[houseid][E_HOUSE_INT_X], HouseData[houseid][E_HOUSE_INT_Y], HouseData[houseid][E_HOUSE_INT_Z], HouseData[houseid][E_HOUSE_ENTER_X], HouseData[houseid][E_HOUSE_ENTER_Y], HouseData[houseid][E_HOUSE_ENTER_Z], HouseData[houseid][E_HOUSE_ENTER_A],
+HouseData[houseid][E_HOUSE_EXIT_X], HouseData[houseid][E_HOUSE_EXIT_Y], HouseData[houseid][E_HOUSE_EXIT_Z], HouseData[houseid][E_HOUSE_EXIT_A], HouseData[houseid][E_HOUSE_EXT_INTERIOR], HouseData[houseid][E_HOUSE_EXT_WORLD], HouseData[houseid][E_HOUSE_INT_INTERIOR], HouseData[houseid][E_HOUSE_INT_WORLD]);
+	gDatabaseResult = db_query(gServerDatabase, query);
+	db_free_result(gDatabaseResult);
 	
 	return GameTextForPlayer(playerid, "~g~House Created!", 3000, 5);
 }
@@ -937,20 +970,20 @@ CMD:deletehouse(playerid, params[])
 	new query[128];
 	for(new i = 0; i < MAX_HOUSES; i++)
 	{
-	    if(HouseData[i][house_active] == true)
+	    if(HouseData[i][E_HOUSE_IS_ACTIVE] == true)
 	    {
-		    if(IsPlayerInRangeOfPoint(playerid, 5.0, HouseData[i][house_extx], HouseData[i][house_exty], HouseData[i][house_extz]))
+		    if(IsPlayerInRangeOfPoint(playerid, 5.0, HouseData[i][E_HOUSE_EXT_X], HouseData[i][E_HOUSE_EXT_Y], HouseData[i][E_HOUSE_EXT_Z]))
 		  	{
-				DestroyDynamic3DTextLabel(HouseData[i][house_label]);
-				DestroyDynamicMapIcon(HouseData[i][house_mapicon]);
-				DestroyDynamicCP(HouseData[i][house_entercp]);
-				DestroyDynamicCP(HouseData[i][house_exitcp]);
+				DestroyDynamic3DTextLabel(HouseData[i][E_HOUSE_LABEL]);
+				DestroyDynamicMapIcon(HouseData[i][E_HOUSE_MAPICON]);
+				DestroyDynamicCP(HouseData[i][E_HOUSE_ENTER_CP]);
+				DestroyDynamicCP(HouseData[i][E_HOUSE_EXIT_CP]);
 
-				HouseData[i][house_active] = false;
+				HouseData[i][E_HOUSE_IS_ACTIVE] = false;
 
 				format(query, sizeof(query), "DELETE FROM `HOUSES` WHERE `ID` = '%i'", i);
-				database_result = db_query(server_database, query);
-				db_free_result(database_result);
+				gDatabaseResult = db_query(gServerDatabase, query);
+				db_free_result(gDatabaseResult);
 				return GameTextForPlayer(playerid, "~r~House Deleted!", 3000, 5);
 		    }
 	    }
@@ -965,18 +998,18 @@ CMD:deleteallhouses(playerid, params[])
 	new query[128];
 	for(new i = 0; i < MAX_HOUSES; i++)
 	{
-	    if(HouseData[i][house_active] == true)
+	    if(HouseData[i][E_HOUSE_IS_ACTIVE] == true)
 	    {
-		    DestroyDynamic3DTextLabel(HouseData[i][house_label]);
-			DestroyDynamicMapIcon(HouseData[i][house_mapicon]);
-			DestroyDynamicCP(HouseData[i][house_entercp]);
-			DestroyDynamicCP(HouseData[i][house_exitcp]);
+		    DestroyDynamic3DTextLabel(HouseData[i][E_HOUSE_LABEL]);
+			DestroyDynamicMapIcon(HouseData[i][E_HOUSE_MAPICON]);
+			DestroyDynamicCP(HouseData[i][E_HOUSE_ENTER_CP]);
+			DestroyDynamicCP(HouseData[i][E_HOUSE_EXIT_CP]);
 
-			HouseData[i][house_active] = false;
+			HouseData[i][E_HOUSE_IS_ACTIVE] = false;
 
 			format(query, sizeof(query), "DELETE FROM `HOUSES` WHERE `ID` = '%i'", i);
-			database_result = db_query(server_database, query);
-			db_free_result(database_result);
+			gDatabaseResult = db_query(gServerDatabase, query);
+			db_free_result(gDatabaseResult);
 		}
 	}
 	return GameTextForPlayer(playerid, "~r~All Houses Deleted!", 3000, 5);
@@ -989,28 +1022,28 @@ CMD:resethouseowner(playerid, params[])
 	new owner[MAX_PLAYER_NAME], query[128], name[64], label[128];
 	for(new i = 0; i < MAX_HOUSES; i++)
 	{
-	    if(HouseData[i][house_active] == true)
+	    if(HouseData[i][E_HOUSE_IS_ACTIVE] == true)
 	    {
-		    if(IsPlayerInRangeOfPoint(playerid, 5.0, HouseData[i][house_extx], HouseData[i][house_exty], HouseData[i][house_extz]))
+		    if(IsPlayerInRangeOfPoint(playerid, 5.0, HouseData[i][E_HOUSE_EXT_X], HouseData[i][E_HOUSE_EXT_Y], HouseData[i][E_HOUSE_EXT_Z]))
 		  	{
 		    	GameTextForPlayer(playerid, "~r~House Owner Reset!", 3000, 5);
 
 		     	format(owner, sizeof(owner), "~");
 		     	format(name, sizeof(name), "4-Sale");
-		      	format(label, sizeof(label), "%s\nPrice: $%i", name, HouseData[i][house_value]);
+		      	format(label, sizeof(label), "%s\nPrice: $%i", name, HouseData[i][E_HOUSE_VALUE]);
 
-		      	HouseData[i][house_owner] = owner;
-		     	HouseData[i][house_name] = name;
-		     	HouseData[i][house_safe] = 0;
+		      	HouseData[i][E_HOUSE_OWNER] = owner;
+		     	HouseData[i][E_HOUSE_NAME] = name;
+		     	HouseData[i][E_HOUSE_SAFE] = 0;
 
-		      	DestroyDynamicMapIcon(HouseData[i][house_mapicon]);
-				HouseData[i][house_mapicon] = CreateDynamicMapIcon(HouseData[i][house_extx], HouseData[i][house_exty], HouseData[i][house_extz], 31, -1, -1, -1, -1, 250.0);
+		      	DestroyDynamicMapIcon(HouseData[i][E_HOUSE_MAPICON]);
+				HouseData[i][E_HOUSE_MAPICON] = CreateDynamicMapIcon(HouseData[i][E_HOUSE_EXT_X], HouseData[i][E_HOUSE_EXT_Y], HouseData[i][E_HOUSE_EXT_Z], 31, -1, -1, -1, -1, 250.0);
 
-				format(query, sizeof(query), "UPDATE `HOUSES` SET `OWNER` = '%q', `NAME` = '%q', `SAFE` = '%i' WHERE `ID` = '%i'", owner, name, HouseData[i][house_safe], i);
-				database_result = db_query(server_database, query);
-				db_free_result(database_result);
+				format(query, sizeof(query), "UPDATE `HOUSES` SET `OWNER` = '%q', `NAME` = '%q', `SAFE` = '%i' WHERE `ID` = '%i'", owner, name, HouseData[i][E_HOUSE_SAFE], i);
+				gDatabaseResult = db_query(gServerDatabase, query);
+				db_free_result(gDatabaseResult);
 
-				return UpdateDynamic3DTextLabelText(HouseData[i][house_label], LABEL_COLOUR, label);
+				return UpdateDynamic3DTextLabelText(HouseData[i][E_HOUSE_LABEL], LABEL_COLOUR, label);
 			}
 		}
 	}
@@ -1024,24 +1057,24 @@ CMD:resetallowners(playerid, params[])
 	new owner[MAX_PLAYER_NAME], query[128], name[64], label[128];
 	for(new i = 0; i < MAX_HOUSES; i++)
 	{
-	    if(HouseData[i][house_active] == true)
+	    if(HouseData[i][E_HOUSE_IS_ACTIVE] == true)
 	    {
 		    format(owner, sizeof(owner), "~");
 		 	format(name, sizeof(name), "4-Sale");
-		 	format(label, sizeof(label), "%s\nPrice: $%i", name, HouseData[i][house_value]);
+		 	format(label, sizeof(label), "%s\nPrice: $%i", name, HouseData[i][E_HOUSE_VALUE]);
 
-		  	HouseData[i][house_owner] = owner;
-		  	HouseData[i][house_name] = name;
-		  	HouseData[i][house_safe] = 0;
+		  	HouseData[i][E_HOUSE_OWNER] = owner;
+		  	HouseData[i][E_HOUSE_NAME] = name;
+		  	HouseData[i][E_HOUSE_SAFE] = 0;
 
-			DestroyDynamicMapIcon(HouseData[i][house_mapicon]);
-			HouseData[i][house_mapicon] = CreateDynamicMapIcon(HouseData[i][house_extx], HouseData[i][house_exty], HouseData[i][house_extz], 31, -1, -1, -1, -1, 250.0);
+			DestroyDynamicMapIcon(HouseData[i][E_HOUSE_MAPICON]);
+			HouseData[i][E_HOUSE_MAPICON] = CreateDynamicMapIcon(HouseData[i][E_HOUSE_EXT_X], HouseData[i][E_HOUSE_EXT_Y], HouseData[i][E_HOUSE_EXT_Z], 31, -1, -1, -1, -1, 250.0);
 
-			format(query, sizeof(query), "UPDATE `HOUSES` SET `OWNER` = '%q', `NAME` = '%q', `SAFE` = '%i' WHERE `ID` = '%i'", owner, name, HouseData[i][house_safe], i);
-			database_result = db_query(server_database, query);
-			db_free_result(database_result);
+			format(query, sizeof(query), "UPDATE `HOUSES` SET `OWNER` = '%q', `NAME` = '%q', `SAFE` = '%i' WHERE `ID` = '%i'", owner, name, HouseData[i][E_HOUSE_SAFE], i);
+			gDatabaseResult = db_query(gServerDatabase, query);
+			db_free_result(gDatabaseResult);
 
-			UpdateDynamic3DTextLabelText(HouseData[i][house_label], LABEL_COLOUR, label);
+			UpdateDynamic3DTextLabelText(HouseData[i][E_HOUSE_LABEL], LABEL_COLOUR, label);
 		}
 	}
 	return GameTextForPlayer(playerid, "~r~All Owners Reset!", 3000, 5);
@@ -1054,45 +1087,45 @@ CMD:resethouseprice(playerid, params[])
 	new query[128], label[128];
 	for(new i = 0; i < MAX_HOUSES; i++)
 	{
-	    if(HouseData[i][house_active] == true)
+	    if(HouseData[i][E_HOUSE_IS_ACTIVE] == true)
 	    {
-		    if(IsPlayerInRangeOfPoint(playerid, 5.0, HouseData[i][house_extx], HouseData[i][house_exty], HouseData[i][house_extz]))
+		    if(IsPlayerInRangeOfPoint(playerid, 5.0, HouseData[i][E_HOUSE_EXT_X], HouseData[i][E_HOUSE_EXT_Y], HouseData[i][E_HOUSE_EXT_Z]))
 		  	{
-				if(HouseData[i][house_intinterior] == 6)//1 Story House
+				if(HouseData[i][E_HOUSE_INT_INTERIOR] == 6)//1 Story House
 				{
-		        	HouseData[i][house_value] = HOUSE_ONE_PRICE;
+		        	HouseData[i][E_HOUSE_VALUE] = HOUSE_ONE_PRICE;
 				}
-				else if(HouseData[i][house_intinterior] == 9)//2 Story House
+				else if(HouseData[i][E_HOUSE_INT_INTERIOR] == 9)//2 Story House
 				{
-		        	HouseData[i][house_value] = HOUSE_TWO_PRICE;
+		        	HouseData[i][E_HOUSE_VALUE] = HOUSE_TWO_PRICE;
 				}
-				else if(HouseData[i][house_intinterior] == 12)//Small Mansion
+				else if(HouseData[i][E_HOUSE_INT_INTERIOR] == 12)//Small Mansion
 				{
-		         	HouseData[i][house_value] = MANSION_ONE_PRICE;
+		         	HouseData[i][E_HOUSE_VALUE] = MANSION_ONE_PRICE;
 				}
-				else if(HouseData[i][house_intinterior] == 5)//Large Mansion
+				else if(HouseData[i][E_HOUSE_INT_INTERIOR] == 5)//Large Mansion
 				{
-		         	HouseData[i][house_value] = MANSION_TWO_PRICE;
+		         	HouseData[i][E_HOUSE_VALUE] = MANSION_TWO_PRICE;
 				}
-				else if(HouseData[i][house_intinterior] == 7)//Apartment
+				else if(HouseData[i][E_HOUSE_INT_INTERIOR] == 7)//Apartment
 				{
-		       		HouseData[i][house_value] = APARTMENT_PRICE;
+		       		HouseData[i][E_HOUSE_VALUE] = APARTMENT_PRICE;
 				}
 
-				if(!strcmp(HouseData[i][house_owner], "~", true))
+				if(!strcmp(HouseData[i][E_HOUSE_OWNER], "~", true))
 				{
-					format(label, sizeof(label), "4-Sale\nPrice: $%i", HouseData[i][house_value]);
-					UpdateDynamic3DTextLabelText(HouseData[i][house_label], LABEL_COLOUR, label);
+					format(label, sizeof(label), "4-Sale\nPrice: $%i", HouseData[i][E_HOUSE_VALUE]);
+					UpdateDynamic3DTextLabelText(HouseData[i][E_HOUSE_LABEL], LABEL_COLOUR, label);
 				}
 				else
 				{
-					format(label, sizeof(label), "%s\nValue: $%i", HouseData[i][house_name], HouseData[i][house_value]);
-					UpdateDynamic3DTextLabelText(HouseData[i][house_label], LABEL_COLOUR, label);
+					format(label, sizeof(label), "%s\nValue: $%i", HouseData[i][E_HOUSE_NAME], HouseData[i][E_HOUSE_VALUE]);
+					UpdateDynamic3DTextLabelText(HouseData[i][E_HOUSE_LABEL], LABEL_COLOUR, label);
 				}
 
-				format(query, sizeof(query), "UPDATE `HOUSES` SET `VALUE` = '%i' WHERE `ID` = '%i'", HouseData[i][house_value], i);
-				database_result = db_query(server_database, query);
-				db_free_result(database_result);
+				format(query, sizeof(query), "UPDATE `HOUSES` SET `VALUE` = '%i' WHERE `ID` = '%i'", HouseData[i][E_HOUSE_VALUE], i);
+				gDatabaseResult = db_query(gServerDatabase, query);
+				db_free_result(gDatabaseResult);
 
 				return GameTextForPlayer(playerid, "~r~House Price Reset!", 3000, 5);
 		    }
@@ -1108,45 +1141,48 @@ CMD:resetallprices(playerid, params[])
 	new query[128], label[128];
 	for(new i = 0; i < MAX_HOUSES; i++)
 	{
-	    if(HouseData[i][house_active] == true)
+	    if(HouseData[i][E_HOUSE_IS_ACTIVE] == true)
 	    {
-		    if(HouseData[i][house_intinterior] == 6)//1 Story House
+		    if(HouseData[i][E_HOUSE_INT_INTERIOR] == 6)//1 Story House
 			{
-	       		HouseData[i][house_value] = HOUSE_ONE_PRICE;
+	       		HouseData[i][E_HOUSE_VALUE] = HOUSE_ONE_PRICE;
 			}
-			else if(HouseData[i][house_intinterior] == 9)//2 Story House
+			else if(HouseData[i][E_HOUSE_INT_INTERIOR] == 9)//2 Story House
 			{
-	        	HouseData[i][house_value] = HOUSE_TWO_PRICE;
+	        	HouseData[i][E_HOUSE_VALUE] = HOUSE_TWO_PRICE;
 			}
-			else if(HouseData[i][house_intinterior] == 12)//Small Mansion
+			else if(HouseData[i][E_HOUSE_INT_INTERIOR] == 12)//Small Mansion
 			{
-	        	HouseData[i][house_value] = MANSION_ONE_PRICE;
+	        	HouseData[i][E_HOUSE_VALUE] = MANSION_ONE_PRICE;
 			}
-			else if(HouseData[i][house_intinterior] == 5)//Large Mansion
+			else if(HouseData[i][E_HOUSE_INT_INTERIOR] == 5)//Large Mansion
 			{
-	        	HouseData[i][house_value] = MANSION_TWO_PRICE;
+	        	HouseData[i][E_HOUSE_VALUE] = MANSION_TWO_PRICE;
 			}
-			else if(HouseData[i][house_intinterior] == 7)//Apartment
+			else if(HouseData[i][E_HOUSE_INT_INTERIOR] == 7)//Apartment
 			{
-	       		HouseData[i][house_value] = APARTMENT_PRICE;
+	       		HouseData[i][E_HOUSE_VALUE] = APARTMENT_PRICE;
 			}
 
-			if(!strcmp(HouseData[i][house_owner], "~", true))
+			if(!strcmp(HouseData[i][E_HOUSE_OWNER], "~", true))
 			{
-				format(label, sizeof(label), "4-Sale\nPrice: $%i", HouseData[i][house_value]);
-				UpdateDynamic3DTextLabelText(HouseData[i][house_label], LABEL_COLOUR, label);
+				format(label, sizeof(label), "4-Sale\nPrice: $%i", HouseData[i][E_HOUSE_VALUE]);
+				UpdateDynamic3DTextLabelText(HouseData[i][E_HOUSE_LABEL], LABEL_COLOUR, label);
 			}
 			else
 			{
-				format(label, sizeof(label), "%s\nValue: $%i", HouseData[i][house_name], HouseData[i][house_value]);
-				UpdateDynamic3DTextLabelText(HouseData[i][house_label], LABEL_COLOUR, label);
+				format(label, sizeof(label), "%s\nValue: $%i", HouseData[i][E_HOUSE_NAME], HouseData[i][E_HOUSE_VALUE]);
+				UpdateDynamic3DTextLabelText(HouseData[i][E_HOUSE_LABEL], LABEL_COLOUR, label);
 			}
 
-			format(query, sizeof(query), "UPDATE `HOUSES` SET `VALUE` = '%i' WHERE `ID` = '%i'", HouseData[i][house_value], i);
-			database_result = db_query(server_database, query);
-			db_free_result(database_result);
+			format(query, sizeof(query), "UPDATE `HOUSES` SET `VALUE` = '%i' WHERE `ID` = '%i'", HouseData[i][E_HOUSE_VALUE], i);
+			gDatabaseResult = db_query(gServerDatabase, query);
+			db_free_result(gDatabaseResult);
 		}
 	}
 	return GameTextForPlayer(playerid, "~r~All Prices Reset!", 3000, 5);
 }
 
+
+// -----------------------------------------------------------------------------
+// EOF
